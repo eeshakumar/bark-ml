@@ -254,7 +254,10 @@
         "max_num_agents": 2,
         "n_nearest_agents": 5,
         "max_vel": 30.0,
-        "max_lon": 500.0
+        "min_lon": 5054.98,
+        "max_lon": 5305.0,
+        "min_lat": 5112,
+        "max_lat": 5120
       },
       "Runner": {
         "number_of_collections": 5000000,

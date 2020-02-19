@@ -43,7 +43,13 @@ class CustomEvaluator(GoalReached):
     drivable_area = eval_results["drivable_area"]
 
     # distance_to_goals = self.distance_to_goal(observed_world)
-    lateral_offset = observed_state[0, 1]**2
+    # lateral_offset = observed_state[0, 0]**2
+    ego_agent = observed_world.agents[self._eval_agent]
+    goal_def = ego_agent.goal_definition
+    goal_center_line = goal_def.center_line
+    ego_agent_state = ego_agent.state
+    lateral_offset = Distance(goal_center_line, Point2d(ego_agent_state[1], ego_agent_state[2]))
+    # print(observed_world.bounding_box)
     actions = np.reshape(action, (-1, 2))
     accs = actions[:, 0]
     delta = actions[:, 1]

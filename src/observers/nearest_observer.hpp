@@ -67,8 +67,10 @@ class NearestObserver {
     FrenetPosition frenet_pos(pose, center_line);
     ObservedState ret_state(1, state_size_);
     ret_state <<
-      Norm<float>(frenet_pos.lon - ref_lon, min_lon_, max_lon_),
-      Norm<float>(frenet_pos.lat, min_lat_, max_lat_),
+      Norm<float>(
+        state(StateDefinition::Y_POSITION), min_lon_, max_lon_),
+      Norm<float>(
+        state(StateDefinition::X_POSITION), min_lat_, max_lat_),
       Norm<float>(
         state(StateDefinition::THETA_POSITION), min_theta_, max_theta_),
       Norm<float>(state(StateDefinition::VEL_POSITION), min_vel_, max_vel_);
@@ -81,7 +83,6 @@ class NearestObserver {
     state.setZero();
     // TODO(@hart): this should later be removed
     world->UpdateAgentRTree();
-
     // check in which lane corridor the goal is
     std::shared_ptr<const Agent> ego_agent = world->GetEgoAgent();
     BARK_EXPECT_TRUE(ego_agent != nullptr);
