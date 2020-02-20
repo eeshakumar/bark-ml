@@ -194,12 +194,12 @@
                             1
                         ],
                         "MaxOrientationDifference": [
-                            0.8,
-                            1
+                            0.08,
+                            0.08
                         ],
                         "VelocityRange": [
-                            0.5,
-                            1
+                            10,
+                            30
                         ]
                     },
                     "ConfigControlledAgents": {
