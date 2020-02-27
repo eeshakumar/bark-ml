@@ -53,7 +53,7 @@ class SACRunner(TFARunner):
        Need to overwrite the class of the base function as the metric class somehow does
        not work.
     """
-    global_iteration = self._agent._agent._train_step_counter.numpy()
+    global_iteration = self._agent[0]._agent._train_step_counter.numpy()
     logger.info("Evaluating the agent's performance in {} episodes."
       .format(str(self._params["ML"]["Runner"]["evaluation_steps"])))
     # Ticket (https://github.com/tensorflow/agents/issues/59) recommends
@@ -65,11 +65,12 @@ class SACRunner(TFARunner):
         state = self._unwrapped_runtime.reset()
         is_terminal = False
         while not is_terminal:
-          action_step = self._agent._eval_policy.action(
-            ts.transition(state, reward=0.0, discount=1.0))
-          state, reward, is_terminal, _ = self._unwrapped_runtime.step(
-            action_step.action.numpy())
-          rewards.append(reward)
+          for agent in self._agent:
+            action_step = agent._eval_policy.action(
+              ts.transition(state, reward=0.0, discount=1.0))
+            state, reward, is_terminal, _ = self._unwrapped_runtime.step(
+              action_step.action.numpy())
+            rewards.append(reward)
           steps.append(1)
     mean_reward = np.sum(np.array(rewards))/self._params["ML"]["Runner"]["evaluation_steps"]
     mean_steps = np.sum(np.array(steps))/self._params["ML"]["Runner"]["evaluation_steps"]
@@ -89,12 +90,18 @@ class SACRunner(TFARunner):
   def _train(self):
     """Trains the agent as specified in the parameter file
     """
-    iterator = iter(self._agent._dataset)
+    iterator = []
+    for agent in self._agent:
+      iterator.append(iter(agent._dataset))
     for _ in range(0, self._params["ML"]["Runner"]["number_of_collections"]):
-      global_iteration = self._agent._agent._train_step_counter.numpy()
-      self._collection_driver.run()
-      experience, _ = next(iterator)
-      self._agent._agent.train(experience)
+      global_iteration = self._agent[0]._agent._train_step_counter.numpy()
+      for i in range(0, len(self._collection_driver)):
+        self._collection_driver[i].run()
+      for i, it in enumerate(iterator):
+        experience, _ = next(it)
+        self._agent[i]._agent.train(experience)
       if global_iteration % self._params["ML"]["Runner"]["evaluate_every_n_steps"] == 0:
         self.evaluate()
-        self._agent.save()
+        for agent in self._agent:
+          agent.save()
+          

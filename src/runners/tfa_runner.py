@@ -57,30 +57,36 @@ class TFARunner(BaseRunner):
   def get_initial_collection_driver(self):
     """Sets the initial collection driver for tf-agents.
     """
-    self._initial_collection_driver = \
-      dynamic_episode_driver.DynamicEpisodeDriver(
-        env=self._runtime,
-        policy=self._agent._agent.collect_policy,
-        observers=[self._agent._replay_buffer.add_batch],
-        num_episodes=self._params["ML"]["Runner"]["initial_collection_steps"])
+    self._initial_collection_driver = []    
+    for agent in self._agent:
+      self._initial_collection_driver.append( \
+        dynamic_episode_driver.DynamicEpisodeDriver(
+          env=self._runtime,
+          policy=agent.collect_policy,
+          observers=[agent._replay_buffer.add_batch],
+          num_episodes=self._params["ML"]["Runner"]["initial_collection_steps"]))
     # self._initial_collection_driver.run = common.function(
     #   self._initial_collection_driver.run)
 
   def get_collection_driver(self):
     """Sets the collection driver for tf-agents.
     """
-    self._collection_driver = dynamic_episode_driver.DynamicEpisodeDriver(
-      env=self._runtime,
-      policy=self._agent._agent.collect_policy,
-      observers=[self._agent._replay_buffer.add_batch],
-      num_episodes=self._params["ML"]["Runner"]["collection_episodes_per_cycle"])
+    self._collection_driver = []
+    for agent in self._agent:
+      self._collection_driver.append( \
+        dynamic_episode_driver.DynamicEpisodeDriver(
+          env=self._runtime,
+          policy=agent._agent.collect_policy,
+          observers=[agent._replay_buffer.add_batch],
+          num_episodes=self._params["ML"]["Runner"]["collection_episodes_per_cycle"]))
     # self._collection_driver.run = common.function(self._collection_driver.run)
 
   def collect_initial_episodes(self):
     """Function that collects the initial episodes
     """
-    self._initial_collection_driver.run()
-
+    for i in range(len(self._initial_collection_driver)):
+      self._initial_collection_driver[i].run()
+      
   def train(self):
     """Wrapper that sets the summary writer.
        This enables a seamingless integration with TensorBoard.
@@ -133,7 +139,7 @@ class TFARunner(BaseRunner):
         is_terminal = False
         while not is_terminal:
           print(state)
-          action_step = self._agent._eval_policy.action(ts.transition(state, reward=0.0, discount=1.0))
+          action_step = self._agent[0]._eval_policy.action(ts.transition(state, reward=0.0, discount=1.0))
           print(action_step)
           # TODO(@hart); make generic for multi agent planning
           state, reward, is_terminal, _ = self._unwrapped_runtime.step(action_step.action.numpy())
