@@ -42,12 +42,13 @@ class DynamicModel(ActionWrapper):
         raise ValueError("AgentID does not exist in world.")
     return world
 
-  def action_to_behavior(self, world, action):
+  def action_to_behavior(self, world, action, agent_id=0):
     """see base class
     """
-    actions = np.reshape(action, (-1, self._control_inputs))
-    for i, a in enumerate(actions):
-      self._behavior_models[i].SetLastAction(a)
+    world.GetAgent(agent_id).behavior_model.SetLastAction(action)
+    # actions = np.reshape(action, (-1, self._control_inputs))
+    # for i, a in enumerate(actions):
+    #   self._behavior_models[i].SetLastAction(a)
     return world
 
   @property

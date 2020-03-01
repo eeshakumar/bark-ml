@@ -57,9 +57,9 @@ class TFARunner(BaseRunner):
   def get_initial_collection_driver(self):
     """Sets the initial collection driver for tf-agents.
     """
-    self._initial_collection_driver = []    
+    self._initial_collection_drivers = []    
     for agent in self._agent:
-      self._initial_collection_driver.append( \
+      self._initial_collection_drivers.append( \
         dynamic_episode_driver.DynamicEpisodeDriver(
           env=self._runtime,
           policy=agent.collect_policy,
@@ -71,9 +71,9 @@ class TFARunner(BaseRunner):
   def get_collection_driver(self):
     """Sets the collection driver for tf-agents.
     """
-    self._collection_driver = []
+    self._collection_drivers = []
     for agent in self._agent:
-      self._collection_driver.append( \
+      self._collection_drivers.append(
         dynamic_episode_driver.DynamicEpisodeDriver(
           env=self._runtime,
           policy=agent._agent.collect_policy,
@@ -84,8 +84,8 @@ class TFARunner(BaseRunner):
   def collect_initial_episodes(self):
     """Function that collects the initial episodes
     """
-    for i in range(len(self._initial_collection_driver)):
-      self._initial_collection_driver[i].run()
+    for i in range(len(self._initial_collection_drivers)):
+      self._initial_collection_drivers[i].run()
       
   def train(self):
     """Wrapper that sets the summary writer.

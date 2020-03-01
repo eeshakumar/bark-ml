@@ -95,8 +95,8 @@ class SACRunner(TFARunner):
       iterator.append(iter(agent._dataset))
     for _ in range(0, self._params["ML"]["Runner"]["number_of_collections"]):
       global_iteration = self._agent[0]._agent._train_step_counter.numpy()
-      for i in range(0, len(self._collection_driver)):
-        self._collection_driver[i].run()
+      for i in range(0, len(self._collection_drivers)):
+        self._collection_drivers[i].run()
       for i, it in enumerate(iterator):
         experience, _ = next(it)
         self._agent[i]._agent.train(experience)

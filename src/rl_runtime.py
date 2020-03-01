@@ -24,6 +24,7 @@ class RuntimeRL(Runtime):
     self._action_wrapper = action_wrapper
     self._observer = observer
     self._evaluator = evaluator
+    self._idx_collection_driver = 0
 
   def reset(self, scenario=None):
     """Resets the runtime and its objects
@@ -49,10 +50,23 @@ class RuntimeRL(Runtime):
     Returns:
         (next_state, reward, done, info) -- RL tuple
     """
-    # TODO(@hart): could be multiple actions
-    self._world = self._action_wrapper.action_to_behavior(world=self._world,
-                                                          action=action)
+    stepped_agent_id = self._scenario._eval_agent_ids[
+      self._idx_collection_driver]
+    self._idx_collection_driver += 1
+    # this sets the action for an agent in the world
+    # observed_world = self._world.Observe([stepped_agent_id])[0]
+    # observed_world.PredictWithOthersIDM(0.2, action)
+
+    self._world = self._action_wrapper.action_to_behavior(
+      world=self._world,
+      action=action,
+      agent_id=stepped_agent_id)
+    if self._idx_collection_driver >= len(self._scenario._eval_agent_ids):
+      self._idx_collection_driver = 0
     
+    
+    # this will step all of the agents
+    # TODO: only step the world once all actions have been set
     self._world.Step(self._step_time)
     snapshot =  self.snapshot(
       world=self._world,
