@@ -32,14 +32,14 @@
   "Scenario": {
     "Generation": {
         "GeneratorName": "ConfigurableScenarioGeneration",
-        "GeneratorSeed": 1000,
+        "GeneratorSeed": 2000,
         "SetName": "no_variation",
         "SetDescription": "Ego vehicle is the only vehicle on the right lane. Must merge to left lane where it is crowded with IDM vehicles",
         "NumScenarios": 100,
         "NumSets": 1,
         "ConfigurableScenarioGeneration": {
             "MapFilename": "tests/data/city_highway_straight.xodr",
-            "RandomSeed": 1000,
+            "RandomSeed": 2000,
             "SinksSources": [
                 {
                     "SourceSink": [
@@ -162,7 +162,7 @@
                             "BehaviorIDMClassic": {
                                 "MaxVelocity": 30.0,
                                 "MinimumSpacing": 2.0,
-                                "DesiredTimeHeadway": 1.5,
+                                "DesiredTimeHeadway": 3.0,
                                 "MaxAcceleration": 1.7000000476837158,
                                 "AccelerationLowerBound": -15.0,
                                 "AccelerationUpperBound": 8.0,
@@ -221,9 +221,27 @@
 },
 
     "ML": {
-        "Agent": {
+        "PPOAgent": {
           "actor_fc_layer_params": [512, 256, 256],
-          "critic_joint_fc_layer_params": [512, 256, 256],
+          "critic_fc_layer_params": [512, 256, 256],
+          "learning_rate": 3e-4,
+          "num_epochs": 1,
+          "agent_name": "ppo_agent",
+          "debug_summaries": false,
+          "replay_buffer_capacity": 10000,
+          "max_ckpts_to_keep": 3,
+          "num_parallel_environments": 1,
+          "parallel_buffer_calls": 1,
+          "buffer_num_steps": 1,
+          "buffer_prefetch": 1,
+          "batch_size": 256,
+          "normalize_observations": true,
+          "normalize_rewards": false,
+          "checkpoint_path": "configurations/highway/checkpoints/"
+        },
+        "Agent": {
+          "actor_fc_layer_params": [512, 512, 256],
+          "critic_joint_fc_layer_params": [512, 512, 256],
           "actor_learning_rate": 3e-4,
           "critic_learning_rate": 3e-4,
           "alpha_learning_rate": 3e-4,
