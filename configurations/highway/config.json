@@ -68,7 +68,7 @@
                         ],
                         "SRange": [
                             0.1,
-                            0.9
+                            0.5
                         ]
                     },
                     "ConfigBehaviorModels": {
@@ -119,7 +119,7 @@
                         ]
                     },
                     "ConfigControlledAgents": {
-                        "type": "NoneControlled"
+                        "type": "RandomSingleAgent"
                     },
                     "AgentParams": {
                         "MaxHistoryLength": 50

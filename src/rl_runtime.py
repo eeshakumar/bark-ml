@@ -49,32 +49,40 @@ class RuntimeRL(Runtime):
     """
     stepped_agent_id = self._scenario._eval_agent_ids[
       self._idx_collection_driver]
-    self._idx_collection_driver += 1
-    # this sets the action for an agent in the world
-    # observed_world = self._world.Observe([stepped_agent_id])[0]
-    # observed_world.PredictWithOthersIDM(0.2, action)
 
     self._world = self._action_wrapper.action_to_behavior(
       world=self._world,
       action=action,
       agent_id=stepped_agent_id)
-    if self._idx_collection_driver >= len(self._scenario._eval_agent_ids):
-      self._idx_collection_driver = 0
     
     
-    # this will step all of the agents
-    # TODO: only step the world once all actions have been set
-    self._world.Step(self._step_time)
-    observed_world = self._world.Observe([self._scenario._eval_agent_ids[0]])[0]
-    # next_observed_world = observed_world.PredictWithOthersIDM(self._step_time, action)
+    # this sets the action for an agent in the world
+    observed_world = self._world.Observe([stepped_agent_id])[0]
+    next_observed_world = observed_world.PredictWithOthersIDM(
+      self._step_time, action)
+
+
     # print(observed_world.Evaluate())
     snapshot =  self.snapshot(
-      observed_world=observed_world,
+      observed_world=next_observed_world,
       action=action)
+    print(f'''
+           Agent-ID: {next_observed_world.ego_agent.id}
+           Action: {action}
+           Observation: {snapshot[0]}
+           ''')
     if self._render:
       self.render()
-    return snapshot
 
+    # this will step all of the agents
+    # TODO: only step the world once all actions have been set
+    self._idx_collection_driver += 1
+    if self._idx_collection_driver >= len(self._scenario._eval_agent_ids):
+      self._idx_collection_driver = 0
+      self._world.Step(self._step_time)
+      
+    return snapshot
+    
   @property
   def action_space(self):
     """Action space of the agent
