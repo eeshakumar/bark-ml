@@ -34,6 +34,7 @@ class RuntimeRL(Runtime):
     self._world = self._evaluator.reset(self._world)
     self._world = self._action_wrapper.reset(self._world,
                                              self._scenario._eval_agent_ids)
+    self._should_terminate = False
     observed_world = self._world.Observe(
       self._scenario._eval_agent_ids)[0]
     return self._observer.observe(observed_world)
@@ -63,14 +64,18 @@ class RuntimeRL(Runtime):
 
 
     # print(observed_world.Evaluate())
-    snapshot =  self.snapshot(
+    next_state, reward, done, info =  self.snapshot(
       observed_world=next_observed_world,
       action=action)
     print(f'''
            Agent-ID: {next_observed_world.ego_agent.id}
            Action: {action}
-           Observation: {snapshot[0]}
+           Observation: {next_state}
+           Done: {done}
            ''')
+    if done == True:
+      self._should_terminate = True
+
     if self._render:
       self.render()
 
@@ -80,8 +85,9 @@ class RuntimeRL(Runtime):
     if self._idx_collection_driver >= len(self._scenario._eval_agent_ids):
       self._idx_collection_driver = 0
       self._world.Step(self._step_time)
+      done = self._should_terminate
       
-    return snapshot
+    return next_state, reward, done, info
     
   @property
   def action_space(self):

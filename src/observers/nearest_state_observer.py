@@ -28,6 +28,8 @@ class ClosestAgentsObserver(StateObserver):
     """
     ego_observed_world = observed_world
     num_other_agents = len(ego_observed_world.other_agents)
+    if ego_observed_world.ego_agent is None:
+      return None
     ego_state = ego_observed_world.ego_agent.state
 
     # calculate nearest agent distances
