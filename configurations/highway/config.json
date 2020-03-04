@@ -119,7 +119,7 @@
                         ]
                     },
                     "ConfigControlledAgents": {
-                        "type": "RandomSingleAgent"
+                        "type": "NoneControlled"
                     },
                     "AgentParams": {
                         "MaxHistoryLength": 50
