@@ -42,6 +42,8 @@ class SACRunner(TFARunner):
     # collect initial episodes
     self.collect_initial_episodes()
     # main training cycle
+    self._summary_writer = tf.summary.create_file_writer(
+          self._params["BaseDir"] + "/" + self._params["ML"]["Runner"]["summary_path"])
     if self._summary_writer is not None:
       with self._summary_writer.as_default():
         self._train()
@@ -70,6 +72,7 @@ class SACRunner(TFARunner):
               ts.transition(state, reward=0.0, discount=1.0))
             state, reward, is_terminal, _ = self._unwrapped_runtime.step(
               action_step.action.numpy())
+            # print("is_terminal = ", is_terminal)
             rewards.append(reward)
           steps.append(1)
     mean_reward = np.sum(np.array(rewards))/self._params["ML"]["Runner"]["evaluation_steps"]

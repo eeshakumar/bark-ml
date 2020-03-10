@@ -37,6 +37,7 @@ class RuntimeRL(Runtime):
     self._should_terminate = False
     observed_world = self._world.Observe(
       self._scenario._eval_agent_ids)[0]
+    self._idx_collection_driver = 1
     return self._observer.observe(observed_world)
 
   def step(self, action):
@@ -50,18 +51,11 @@ class RuntimeRL(Runtime):
     """
     stepped_agent_id = self._scenario._eval_agent_ids[
       self._idx_collection_driver]
-
     self._world = self._action_wrapper.action_to_behavior(
       world=self._world,
       action=action,
       agent_id=stepped_agent_id)
-    
-    
-    # this sets the action for an agent in the world
-    # next_observed_world = self._world.Observe([stepped_agent_id])[0]
-    # next_observed_world = observed_world.PredictWithOthersIDM(
-    #   self._step_time, action)
-
+  
     self._idx_collection_driver += 1
     if self._idx_collection_driver >= len(self._scenario._eval_agent_ids):
       self._idx_collection_driver = 0
@@ -71,7 +65,6 @@ class RuntimeRL(Runtime):
       done = self._should_terminate
 
     observed_world = self._world.Observe([stepped_agent_id])[0]  
-
     next_state, reward, done, info =  self.snapshot(
       observed_world=observed_world,
       action=action)
@@ -112,7 +105,6 @@ class RuntimeRL(Runtime):
     Returns:
         (next_state, reward, done, info) -- RL tuple
     """
-    # TODO(@hart): could be multiple
     next_state = self._observer.observe(observed_world)
     reward, done, info = self._evaluator.evaluate(
       observed_world=observed_world,

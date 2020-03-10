@@ -1,4 +1,7 @@
 import os
+import sys
+for p in sys.path:
+  print(p)
 import matplotlib as mpl
 # if os.environ.get('DISPLAY') == ':0':
 #   print('No display found. Using non-interactive Agg backend')

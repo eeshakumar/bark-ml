@@ -3,7 +3,7 @@ astor==0.8.1
 cachetools==4.0.0
 certifi==2019.11.28
 chardet==3.0.4
-cloudpickle==1.2.2
+cloudpickle==1.1.1
 cycler==0.10.0
 decorator==4.4.1
 future==0.18.2
@@ -52,3 +52,4 @@ urllib3==1.25.7
 Werkzeug==0.16.0
 wrapt==1.11.2
 aabbtree==2.3.1
+pysqlite3==0.4.2

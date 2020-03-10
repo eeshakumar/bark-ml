@@ -65,8 +65,6 @@ class TFARunner(BaseRunner):
           policy=agent.collect_policy,
           observers=[agent._replay_buffer.add_batch],
           num_episodes=self._params["ML"]["Runner"]["initial_collection_steps"]))
-    # self._initial_collection_driver.run = common.function(
-    #   self._initial_collection_driver.run)
 
   def get_collection_driver(self):
     """Sets the collection driver for tf-agents.
@@ -74,12 +72,11 @@ class TFARunner(BaseRunner):
     self._collection_drivers = []
     for agent in self._agent:
       self._collection_drivers.append(
-        dynamic_episode_driver.DynamicEpisodeDriver(
+        dynamic_step_driver.DynamicStepDriver(
           env=self._runtime,
           policy=agent._agent.collect_policy,
           observers=[agent._replay_buffer.add_batch],
-          num_episodes=self._params["ML"]["Runner"]["collection_episodes_per_cycle"]))
-    # self._collection_driver.run = common.function(self._collection_driver.run)
+          num_steps=1))
 
   def collect_initial_episodes(self):
     """Function that collects the initial episodes
@@ -140,8 +137,7 @@ class TFARunner(BaseRunner):
         while not is_terminal:
           for agent in self._agent:
             action_step = agent._eval_policy.action(ts.transition(state, reward=0.0, discount=1.0))
-            print(action_step)
-            # TODO(@hart); make generic for multi agent planning
             state, reward, is_terminal, _ = self._unwrapped_runtime.step(action_step.action.numpy())
-            print(state, reward)
+            # print("is_terminal = ", is_terminal)
+            # if is_terminal == True: break
             self._unwrapped_runtime.render()

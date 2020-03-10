@@ -77,7 +77,8 @@ class HighwayConfiguration(BaseConfiguration):
     #                          self._agent,
     #                          params=self._params,
     #                          unwrapped_runtime=self._runtime)
-    self._agents = [SACAgent(tfa_env, params=self._params)]
+    self._agents = [SACAgent(tfa_env, params=self._params),
+                    SACAgent(tfa_env, params=self._params)]
     self._runner = SACRunner(tfa_env,
                              self._agents,
                              params=self._params,
