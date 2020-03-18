@@ -5,6 +5,9 @@
 
 
 import unittest
+import pickle
+import os
+import copy
 import tensorflow as tf
 import numpy as np
 tf.compat.v1.enable_v2_behavior()
@@ -52,9 +55,17 @@ class PyBarkAgentTests(unittest.TestCase):
     bark_agent = BARKMLBehaviorModel(configuration)
     env._world.agents[env._scenario._eval_agent_ids[0]].behavior_model = bark_agent
 
-    for _ in range(0, 10):
-      env.step()
+    env.step()
 
+    f = open(os.path.join("./ml_behavior_model.pickle"), "wb")
+    pickle.dump(bark_agent, f)
+
+    f = open(os.path.join("./ml_behavior_model.pickle"), "rb")
+    bark_agent = pickle.load(f)
+
+    ba_copy = copy.deepcopy(bark_agent)
+    env._world.agents[env._scenario._eval_agent_ids[0]].behavior_model = ba_copy
+    env.step()
 
 if __name__ == '__main__':
   unittest.main()

@@ -14,6 +14,7 @@ from modules.runtime.scenario.scenario_generation.configurable_scenario_generati
 from modules.runtime.commons.parameters import ParameterServer
 from modules.runtime.viewer.matplotlib_viewer import MPViewer
 from modules.runtime.viewer.video_renderer import VideoRenderer
+from modules.runtime.viewer.pygame_viewer import PygameViewer
 
 
 from src.rl_runtime import RuntimeRL
@@ -22,7 +23,9 @@ from src.wrappers.dynamic_model import DynamicModel
 from src.wrappers.tfa_wrapper import TFAWrapper
 from src.evaluators.goal_reached import GoalReached
 from src.agents.sac_agent import SACAgent
+from src.agents.ppo_agent import PPOAgent
 from src.runners.sac_runner import SACRunner
+from src.runners.ppo_runner import PPORunner
 from configurations.base_configuration import BaseConfiguration
 
 # configuration specific evaluator
@@ -60,7 +63,6 @@ class HighwayConfiguration(BaseConfiguration):
     viewer = MPViewer(params=self._params,
                       use_world_bounds=True)
                       # follow_agent_id=True)
-                      
     self._viewer = viewer
     self._runtime = RuntimeRL(action_wrapper=self._behavior_model,
                               observer=self._observer,
