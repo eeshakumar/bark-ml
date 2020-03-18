@@ -44,7 +44,6 @@ class HighwayConfiguration(BaseConfiguration):
   def _build_configuration(self):
     """Builds a configuration using an SAC agent
     """
-    # TO HAVE THE ENV
     left_corr = LeftLaneCorridorConfig()
     right_corr = RightLaneCorridorConfig()
     self._scenario_generator = \
@@ -53,7 +52,7 @@ class HighwayConfiguration(BaseConfiguration):
                      random_seed=0,
                      params=self._params,
                      lane_corridor_configs=[left_corr, right_corr])
-    # END
+
 
     self._observer = NearestObserver(self._params)
     self._behavior_model = DynamicModel(params=self._params)
@@ -77,7 +76,7 @@ class HighwayConfiguration(BaseConfiguration):
                              params=self._params,
                              unwrapped_runtime=self._runtime)
 
-    # generate scenario will all agent being controlled by the policy
+    # overwrite scenario generation
     left_corr = LeftLaneCorridorConfig()
     right_corr = RightLaneCorridorConfig(
       ml_agent=self._agent,
