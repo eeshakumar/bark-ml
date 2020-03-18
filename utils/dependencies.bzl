@@ -6,18 +6,18 @@ def _maybe(repo_rule, name, **kwargs):
         repo_rule(name = name, **kwargs)
 
 def barkml_deps():
-  # _maybe(
-  #   native.local_repository,
-  #   name = "bark_project",
-  #   path="/home/hart/Dokumente/2020/bark",
-  # )
-  
   _maybe(
-    git_repository,
+    native.local_repository,
     name = "bark_project",
-    commit="e13042163625fdb7c5332da195f8d88d9bd70845",
-    remote = "https://github.com/bark-simulator/bark",
+    path="/Users/hart/2019/bark",
   )
+  
+  # _maybe(
+  #   git_repository,
+  #   name = "bark_project",
+  #   commit="e13042163625fdb7c5332da195f8d88d9bd70845",
+  #   remote = "https://github.com/bark-simulator/bark",
+  # )
 
   _maybe(
     http_archive,
@@ -25,8 +25,7 @@ def barkml_deps():
     sha256 = "6e16c8bc91b1310a44f3965e616383dbda48f83e8c1eaa2370a215057b00cabe",
     strip_prefix = "gflags-77592648e3f3be87d6c7123eb81cbad75f9aef5a",
     urls = [
-        "https://mirror.bazel.build/github.com/gflags/gflags/archive/77592648e3f3be87d6c7123eb81cbad75f9aef5a.tar.gz",
-        "https://github.com/gflags/gflags/archive/77592648e3f3be87d6c7123eb81cbad75f9aef5a.tar.gz",
+        "https://mirror.bazel.build/github.com/gflags/gflags/archive/77592648e3f3be87d6c7123eb81cbad75f9aef5a.tar.gz"
     ]
   )
 
