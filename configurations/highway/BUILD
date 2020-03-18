@@ -18,6 +18,17 @@ py_library(
 )
 
 py_library(
+    name = "scenario_conf",
+    srcs = ["scenario_conf.py"],
+    data = ["@bark_project//python:bark.so"],
+    imports = ["../../python/",
+               "../external/bark_project/python/"],
+    deps = ["@bark_project//modules/runtime:runtime",
+            "//src/evaluators:evaluators"],
+    visibility = ["//visibility:public"],
+)
+
+py_library(
   name = "configuration_lib",
   srcs = ["configuration_lib.py"],
   data = ["@bark_project//python:bark.so",
@@ -33,6 +44,7 @@ py_library(
           "//src/runners:runners",
           "//configurations:base_configuration",
           ":custom_evaluator",
+          ":scenario_conf",
           "@bark_project//modules/runtime/viewer:video_renderer"],
   visibility = ["//visibility:public"],
 )

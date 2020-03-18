@@ -13,17 +13,22 @@ class BARKMLBehaviorModel(BehaviorModel):
      in BARK.
   """
   def __init__(self,
-               configuration=None):
-    BehaviorModel.__init__(self, configuration._params)
-    self._configuration = configuration
+               dynamic_model=None,
+               observer=None,
+               ml_agent=None,
+               params=None):
+    BehaviorModel.__init__(self, params)
+    self._params = params
+    self._observer = observer
+    self._ml_agent = ml_agent
     self._dynamic_behavior_model = DynamicBehaviorModel(
-      self._configuration._behavior_model._dynamic_model,
-      configuration._params)
+      dynamic_model,
+      params)
 
   def Plan(self, delta_time, observed_world):
-    observed_state = self._configuration._observer.observe(
+    observed_state = self._observer.observe(
       observed_world)
-    action = self._configuration._agent.act(observed_state)
+    action = self._ml_agent.act(observed_state)
     self._dynamic_behavior_model.SetLastAction(action)
     trajectory = self._dynamic_behavior_model.Plan(delta_time, observed_world)
     super(BARKMLBehaviorModel, self).SetLastTrajectory(trajectory)
