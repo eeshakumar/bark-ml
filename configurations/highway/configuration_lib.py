@@ -80,14 +80,14 @@ class HighwayConfiguration(BaseConfiguration):
                              unwrapped_runtime=self._runtime)
 
     # overwrite scenario generation
-    left_corr = LeftLaneCorridorConfig(params=self._params)
-    right_corr = RightLaneCorridorConfig(
-      ml_agent=self._agent,
-      observer=self._observer,
-      params=self._params)
-    self._scenario_generator = \
-      ConfigWithEase(num_scenarios=100,
-                     map_file_name=self._params["BaseDir"] + "/tests/data/city_highway_straight.xodr",
-                     random_seed=0,
-                     params=self._params,
-                     lane_corridor_configs=[left_corr, right_corr])
+    # left_corr = LeftLaneCorridorConfig(params=self._params)
+    # right_corr = RightLaneCorridorConfig(
+    #   ml_agent=self._agent,
+    #   observer=self._observer,
+    #   params=self._params)
+    # self._scenario_generator = \
+    #   ConfigWithEase(num_scenarios=100,
+    #                  map_file_name=self._params["BaseDir"] + "/tests/data/city_highway_straight.xodr",
+    #                  random_seed=0,
+    #                  params=self._params,
+    #                  lane_corridor_configs=[left_corr, right_corr])
