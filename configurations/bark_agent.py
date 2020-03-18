@@ -5,8 +5,6 @@ from modules.runtime.commons.parameters import ParameterServer
 from configurations.base_configuration import BaseConfiguration
 from bark.world import World, ObservedWorld
 
-# include all configurations
-from configurations.highway.configuration import HighwayConfiguration
 
 class BARKMLBehaviorModel(BehaviorModel):
   """This class makes a trained agent available as BehaviorModel

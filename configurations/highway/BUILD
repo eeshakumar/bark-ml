@@ -24,7 +24,9 @@ py_library(
     imports = ["../../python/",
                "../external/bark_project/python/"],
     deps = ["@bark_project//modules/runtime:runtime",
-            "//src/evaluators:evaluators"],
+            "//src/evaluators:evaluators",
+            "//configurations:bark_agent"
+            ],
     visibility = ["//visibility:public"],
 )
 

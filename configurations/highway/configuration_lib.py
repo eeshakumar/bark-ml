@@ -10,6 +10,8 @@ from modules.runtime.scenario.scenario_generation.deterministic \
   import DeterministicScenarioGeneration
 from modules.runtime.scenario.scenario_generation.configurable_scenario_generation import \
   ConfigurableScenarioGeneration
+from modules.runtime.scenario.scenario_generation.config_with_ease import \
+  LaneCorridorConfig, ConfigWithEase
 
 from modules.runtime.commons.parameters import ParameterServer
 from modules.runtime.viewer.matplotlib_viewer import MPViewer
@@ -32,7 +34,6 @@ from configurations.base_configuration import BaseConfiguration
 from configurations.highway.custom_evaluator import CustomEvaluator
 from configurations.highway.scenario_conf import LeftLaneCorridorConfig, \
   RightLaneCorridorConfig
-from bark_ml.observers import NearestObserver
 
 
 class HighwayConfiguration(BaseConfiguration):
@@ -47,8 +48,8 @@ class HighwayConfiguration(BaseConfiguration):
   def _build_configuration(self):
     """Builds a configuration using an SAC agent
     """
-    left_corr = LeftLaneCorridorConfig()
-    right_corr = RightLaneCorridorConfig()
+    left_corr = LeftLaneCorridorConfig(params=self._params)
+    right_corr = RightLaneCorridorConfig(params=self._params)
     self._scenario_generator = \
       ConfigWithEase(num_scenarios=1,
                      map_file_name=self._params["BaseDir"] + "/tests/data/city_highway_straight.xodr",
@@ -57,7 +58,7 @@ class HighwayConfiguration(BaseConfiguration):
                      lane_corridor_configs=[left_corr, right_corr])
 
 
-    self._observer = NearestObserver(self._params)
+    self._observer = ClosestAgentsObserver(self._params)
     self._behavior_model = DynamicModel(params=self._params)
     self._evaluator = CustomEvaluator(params=self._params)
     viewer = MPViewer(params=self._params,
@@ -79,10 +80,11 @@ class HighwayConfiguration(BaseConfiguration):
                              unwrapped_runtime=self._runtime)
 
     # overwrite scenario generation
-    left_corr = LeftLaneCorridorConfig()
+    left_corr = LeftLaneCorridorConfig(params=self._params)
     right_corr = RightLaneCorridorConfig(
       ml_agent=self._agent,
-      observer=self._observer)
+      observer=self._observer,
+      params=self._params)
     self._scenario_generator = \
       ConfigWithEase(num_scenarios=100,
                      map_file_name=self._params["BaseDir"] + "/tests/data/city_highway_straight.xodr",

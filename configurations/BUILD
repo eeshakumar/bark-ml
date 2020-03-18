@@ -3,8 +3,7 @@ py_library(
     srcs = ["bark_agent.py"],
     data = ["@bark_project//python:bark.so"],
     imports = ["../external/bark_project/python/"],
-    deps = ["@bark_project//modules/runtime:runtime",
-            "//configurations/highway:configuration"],
+    deps = ["@bark_project//modules/runtime:runtime"],
     visibility = ["//visibility:public"],
 )
 

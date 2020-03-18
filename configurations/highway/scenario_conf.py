@@ -14,6 +14,7 @@ from bark.geometry import *
 from modules.runtime.scenario.scenario_generation.config_with_ease import \
   LaneCorridorConfig, ConfigWithEase
 
+from configurations.bark_agent import BARKMLBehaviorModel
 
 class LeftLaneCorridorConfig(LaneCorridorConfig):
   def __init__(self,
@@ -21,8 +22,8 @@ class LeftLaneCorridorConfig(LaneCorridorConfig):
                 lane_corridor_id=0,
                 params=None):
     super(LeftLaneCorridorConfig, self).__init__(road_ids,
-                                                  lane_corridor_id,
-                                                  params)
+                                                 lane_corridor_id,
+                                                 params)
 
   # def position(self, world, min_s=0., max_s=150.):
   #   return super(LeftLaneCorridorConfig, self).position(world, min_s, max_s)
@@ -66,9 +67,10 @@ class RightLaneCorridorConfig(LaneCorridorConfig):
                                             (0.1, 0.1),
                                             (10., 15.))
 
+  @property
   def behavior_model(self):
     if self._ml_agent != None and self._observer != None:
-      bark_ml_agent = BARKMLBehaviorModel(
+      return BARKMLBehaviorModel(
         dynamic_model=SingleTrackModel(self._params),
         observer=self._observer,
         ml_agent=self._ml_agent,
