@@ -77,7 +77,7 @@ class HighwayConfiguration(BaseConfiguration):
                              params=self._params,
                              unwrapped_runtime=self._runtime)
 
-    # here we can pass the agent
+    # generate scenario will all agent being controlled by the policy
     left_corr = LeftLaneCorridorConfig()
     right_corr = RightLaneCorridorConfig(
       ml_agent=self._agent,
