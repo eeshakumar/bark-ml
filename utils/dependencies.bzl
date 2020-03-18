@@ -11,12 +11,14 @@ def barkml_deps():
   #   name = "bark_project",
   #   path="/home/hart/Dokumente/2020/bark",
   # )
+  
   _maybe(
     git_repository,
     name = "bark_project",
     branch="master",
     remote = "https://github.com/bark-simulator/bark",
   )
+
   _maybe(
     http_archive,
     name = "com_github_gflags_gflags",
@@ -72,6 +74,7 @@ def barkml_deps():
         "http://bitbucket.org/eigen/eigen/get/3.3.4.tar.bz2",
     ]
   )
+
   _maybe(
     native.new_local_repository,
     name = "python_linux",
