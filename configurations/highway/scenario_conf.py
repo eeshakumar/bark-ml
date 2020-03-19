@@ -72,11 +72,4 @@ class RightLaneCorridorConfig(LaneCorridorConfig):
 
   @property
   def behavior_model(self):
-    # if self._ml_agent != None and self._observer != None:
-    #   return BARKMLBehaviorModel(
-    #     dynamic_model=SingleTrackModel(self._params),
-    #     observer=self._observer,
-    #     ml_agent=self._ml_agent,
-    #     params=self._params)
-    # else:
-    return BehaviorIDMClassic(self._params)
+    return BehaviorConstantVelocity(self._params)

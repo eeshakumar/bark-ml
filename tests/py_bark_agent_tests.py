@@ -37,6 +37,7 @@ class PyBarkAgentTests(unittest.TestCase):
     # check whether the bark agent really does work
     params = ParameterServer(
       filename="configurations/highway/config.json")
+    params["BaseDir"] = "./"
     configuration = HighwayConfiguration(params)
     scenario_generator = configuration._scenario_generator
     
@@ -52,20 +53,24 @@ class PyBarkAgentTests(unittest.TestCase):
                   render=True)
     env.reset()
     dynamic_model = env._world.agents[env._scenario._eval_agent_ids[0]].dynamic_model
-    bark_agent = BARKMLBehaviorModel(configuration)
+    bark_agent = BARKMLBehaviorModel(
+      dynamic_model=SingleTrackModel(params),
+      observer=configuration._observer,
+      ml_agent=configuration._agent,
+      params=params)
+    
     env._world.agents[env._scenario._eval_agent_ids[0]].behavior_model = bark_agent
-
     env.step()
 
-    f = open(os.path.join("./ml_behavior_model.pickle"), "wb")
-    pickle.dump(bark_agent, f)
+    # f = open(os.path.join("./ml_behavior_model.pickle"), "wb")
+    # pickle.dump(bark_agent, f)
 
-    f = open(os.path.join("./ml_behavior_model.pickle"), "rb")
-    bark_agent = pickle.load(f)
+    # f = open(os.path.join("./ml_behavior_model.pickle"), "rb")
+    # bark_agent = pickle.load(f)
 
-    ba_copy = copy.deepcopy(bark_agent)
-    env._world.agents[env._scenario._eval_agent_ids[0]].behavior_model = ba_copy
-    env.step()
+    # ba_copy = copy.deepcopy(bark_agent)
+    # env._world.agents[env._scenario._eval_agent_ids[0]].behavior_model = ba_copy
+    # env.step()
 
 if __name__ == '__main__':
   unittest.main()

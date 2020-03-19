@@ -6,6 +6,7 @@ py_library(
     deps = ["@bark_project//modules/runtime:runtime",
             "//src/wrappers:wrappers",
             "//src/evaluators:evaluators",
+            "//configurations:bark_agent",
             "//src/observers:observers"],
     visibility = ["//visibility:public"],
 )

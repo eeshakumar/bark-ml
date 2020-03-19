@@ -71,30 +71,21 @@ class HighwayConfiguration(BaseConfiguration):
                               scenario_generator=self._scenario_generator)
     tfa_env = tf_py_environment.TFPyEnvironment(TFAWrapper(self._runtime))
     self._agent = SACAgent(tfa_env, params=self._params)
-    self._runner = SACRunner(tfa_env,
-                             self._agent,
-                             params=self._params,
-                             unwrapped_runtime=self._runtime)
-
-    # agent = SACAgent(tfa_env, params=self._params)
-    # observer = ClosestAgentsObserver(self._params)
-    # overwrite scenario generation
+    # make the agent and observer available in the runtime
     self._scenario_generator = \
-      ConfigWithEase(num_scenarios=100,
+      ConfigWithEase(num_scenarios=1,
                      map_file_name=self._params["BaseDir"] + "/tests/data/city_highway_straight.xodr",
                      random_seed=0,
                      params=self._params,
                      lane_corridor_configs=[LeftLaneCorridorConfig(params=self._params),
-                                            RightLaneCorridorConfig(
-                                              ml_agent=self._agent,
-                                              observer=self._observer,
-                                              params=self._params)])
-    self._runtime = RuntimeRL(action_wrapper=self._behavior_model,
-                              observer=self._observer,
-                              evaluator=self._evaluator,
-                              step_time=0.2,
-                              viewer=self._viewer,
-                              scenario_generator=self._scenario_generator)
+                                            RightLaneCorridorConfig(params=self._params,
+                                                                    ml_agent=self._agent,
+                                                                    observer=self._observer)])
+    self._runtime._scenario_generator = self._scenario_generator
+    self._runtime._params = self._params
+    self._runtime._agent = self._agent
+    self._runtime._observer = self._observer
+    
     tfa_env = tf_py_environment.TFPyEnvironment(TFAWrapper(self._runtime))
     self._runner = SACRunner(tfa_env,
                              self._agent,

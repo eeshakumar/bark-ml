@@ -49,7 +49,7 @@ class BARKMLBehaviorModel(BehaviorModel):
   
   # def __setstate__(self, sdict):
   #   # HACK
-  #   base_dir = "/home/hart/Dokumente/2020/bark-ml"
+  #   base_dir = "/Users/hart/2020/bark-ml"
   #   params = ParameterServer(filename=base_dir + "/configurations/highway/config.json")
   #   scenario_generation = params["Scenario"]["Generation"]["ConfigurableScenarioGeneration"]
   #   map_filename = scenario_generation["MapFilename"]

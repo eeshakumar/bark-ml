@@ -15,7 +15,7 @@ def barkml_deps():
   _maybe(
     git_repository,
     name = "bark_project",
-    commit="0f1a48485cca353b61f26440bcb5ec17c7d8170b",
+    branch="polymorph_behavior",
     remote = "https://github.com/bark-simulator/bark",
   )
 
