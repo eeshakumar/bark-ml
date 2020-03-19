@@ -1,6 +1,10 @@
 import numpy as np
 from modules.runtime.runtime import Runtime
 
+from configurations.bark_agent import BARKMLBehaviorModel
+from bark.models.behavior import *
+from bark.models.dynamic import *
+
 class RuntimeRL(Runtime):
   """Runtime wrapper for reinforcement learning.
      Extends the runtime with observers and evaluators.
@@ -24,6 +28,7 @@ class RuntimeRL(Runtime):
     self._action_wrapper = action_wrapper
     self._observer = observer
     self._evaluator = evaluator
+    self._behavior_models = []
 
   def reset(self, scenario=None):
     """Resets the runtime and its objects
@@ -33,6 +38,18 @@ class RuntimeRL(Runtime):
     self._world = self._evaluator.reset(self._world)
     self._world = self._action_wrapper.reset(self._world,
                                              self._scenario._eval_agent_ids)
+    
+    # replace constant vel. models
+    self._behavior_models = []
+    for idx, agent in self._world.agents.items():
+      if isinstance(agent.behavior_model, BehaviorConstantVelocity) and idx != self._scenario._eval_agent_ids[0]:
+        self._behavior_models.append(BARKMLBehaviorModel(
+              dynamic_model=SingleTrackModel(self._params),
+              observer=self._observer,
+              ml_agent=self._agent,
+              params=self._params))
+        agent.behavior_model = self._behavior_models[-1]
+
     observed_world = self._world.Observe(
       self._scenario._eval_agent_ids)[0]
     return self._observer.observe(observed_world)
