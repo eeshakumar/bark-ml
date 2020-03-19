@@ -48,15 +48,13 @@ class HighwayConfiguration(BaseConfiguration):
   def _build_configuration(self):
     """Builds a configuration using an SAC agent
     """
-    left_corr = LeftLaneCorridorConfig(params=self._params)
-    right_corr = RightLaneCorridorConfig(params=self._params)
     self._scenario_generator = \
       ConfigWithEase(num_scenarios=1,
                      map_file_name=self._params["BaseDir"] + "/tests/data/city_highway_straight.xodr",
                      random_seed=0,
                      params=self._params,
-                     lane_corridor_configs=[left_corr, right_corr])
-
+                     lane_corridor_configs=[LeftLaneCorridorConfig(params=self._params),
+                                            RightLaneCorridorConfig(params=self._params)])
 
     self._observer = ClosestAgentsObserver(self._params)
     self._behavior_model = DynamicModel(params=self._params)
@@ -72,22 +70,33 @@ class HighwayConfiguration(BaseConfiguration):
                               viewer=self._viewer,
                               scenario_generator=self._scenario_generator)
     tfa_env = tf_py_environment.TFPyEnvironment(TFAWrapper(self._runtime))
-                   
     self._agent = SACAgent(tfa_env, params=self._params)
     self._runner = SACRunner(tfa_env,
                              self._agent,
                              params=self._params,
                              unwrapped_runtime=self._runtime)
 
+    # agent = SACAgent(tfa_env, params=self._params)
+    # observer = ClosestAgentsObserver(self._params)
     # overwrite scenario generation
-    # left_corr = LeftLaneCorridorConfig(params=self._params)
-    # right_corr = RightLaneCorridorConfig(
-    #   ml_agent=self._agent,
-    #   observer=self._observer,
-    #   params=self._params)
-    # self._scenario_generator = \
-    #   ConfigWithEase(num_scenarios=100,
-    #                  map_file_name=self._params["BaseDir"] + "/tests/data/city_highway_straight.xodr",
-    #                  random_seed=0,
-    #                  params=self._params,
-    #                  lane_corridor_configs=[left_corr, right_corr])
+    self._scenario_generator = \
+      ConfigWithEase(num_scenarios=100,
+                     map_file_name=self._params["BaseDir"] + "/tests/data/city_highway_straight.xodr",
+                     random_seed=0,
+                     params=self._params,
+                     lane_corridor_configs=[LeftLaneCorridorConfig(params=self._params),
+                                            RightLaneCorridorConfig(
+                                              ml_agent=self._agent,
+                                              observer=self._observer,
+                                              params=self._params)])
+    self._runtime = RuntimeRL(action_wrapper=self._behavior_model,
+                              observer=self._observer,
+                              evaluator=self._evaluator,
+                              step_time=0.2,
+                              viewer=self._viewer,
+                              scenario_generator=self._scenario_generator)
+    tfa_env = tf_py_environment.TFPyEnvironment(TFAWrapper(self._runtime))
+    self._runner = SACRunner(tfa_env,
+                             self._agent,
+                             params=self._params,
+                             unwrapped_runtime=self._runtime)

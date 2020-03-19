@@ -25,10 +25,10 @@ class LeftLaneCorridorConfig(LaneCorridorConfig):
                                                  lane_corridor_id,
                                                  params)
 
-  # def position(self, world, min_s=0., max_s=150.):
-  #   return super(LeftLaneCorridorConfig, self).position(world, min_s, max_s)
+  def position(self, world, min_s=10., max_s=150.):
+    return super(LeftLaneCorridorConfig, self).position(world, min_s, max_s)
 
-  def ds(self, s_min=25., s_max=35.):
+  def ds(self, s_min=20., s_max=35.):
     return np.random.uniform(s_min, s_max)
   
   def controlled_goal(self, world):
@@ -56,7 +56,10 @@ class RightLaneCorridorConfig(LaneCorridorConfig):
     self._ml_agent = ml_agent
     self._observer = observer
 
-  def ds(self, s_min=30., s_max=35.):
+  def position(self, world, min_s=10., max_s=150.):
+    return super(RightLaneCorridorConfig, self).position(world, min_s, max_s)
+
+  def ds(self, s_min=20., s_max=35.):
     return np.random.uniform(s_min, s_max)
 
   def controlled_goal(self, world):
@@ -69,11 +72,11 @@ class RightLaneCorridorConfig(LaneCorridorConfig):
 
   @property
   def behavior_model(self):
-    if self._ml_agent != None and self._observer != None:
-      return BARKMLBehaviorModel(
-        dynamic_model=SingleTrackModel(self._params),
-        observer=self._observer,
-        ml_agent=self._ml_agent,
-        params=self._params)
-    else:
-      return BehaviorIDMClassic(self._params)
+    # if self._ml_agent != None and self._observer != None:
+    #   return BARKMLBehaviorModel(
+    #     dynamic_model=SingleTrackModel(self._params),
+    #     observer=self._observer,
+    #     ml_agent=self._ml_agent,
+    #     params=self._params)
+    # else:
+    return BehaviorIDMClassic(self._params)
