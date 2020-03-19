@@ -18,7 +18,7 @@ from configurations.highway.configuration_lib import HighwayConfiguration
 
 FLAGS = flags.FLAGS
 flags.DEFINE_enum('mode',
-                  'train',
+                  'visualize',
                   ['train', 'visualize', 'evaluate'],
                   'Mode the configuration should be executed in.')
 flags.DEFINE_string('base_dir',
