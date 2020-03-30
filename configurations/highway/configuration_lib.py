@@ -49,7 +49,7 @@ class HighwayConfiguration(BaseConfiguration):
     """Builds a configuration using an SAC agent
     """
     self._scenario_generator = \
-      ConfigWithEase(num_scenarios=1,
+      ConfigWithEase(num_scenarios=250,
                      map_file_name=self._params["BaseDir"] + "/tests/data/city_highway_straight.xodr",
                      random_seed=0,
                      params=self._params,
@@ -73,11 +73,13 @@ class HighwayConfiguration(BaseConfiguration):
     self._agent = SACAgent(tfa_env, params=self._params)
     # make the agent and observer available in the runtime
     self._scenario_generator = \
-      ConfigWithEase(num_scenarios=1,
+      ConfigWithEase(num_scenarios=250,
                      map_file_name=self._params["BaseDir"] + "/tests/data/city_highway_straight.xodr",
                      random_seed=0,
                      params=self._params,
-                     lane_corridor_configs=[LeftLaneCorridorConfig(params=self._params),
+                     lane_corridor_configs=[LeftLaneCorridorConfig(params=self._params,
+                                                                   ml_agent=self._agent,
+                                                                   observer=self._observer),
                                             RightLaneCorridorConfig(params=self._params,
                                                                     ml_agent=self._agent,
                                                                     observer=self._observer)])

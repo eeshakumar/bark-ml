@@ -20,10 +20,14 @@ class LeftLaneCorridorConfig(LaneCorridorConfig):
   def __init__(self,
                 road_ids=[16],
                 lane_corridor_id=0,
-                params=None):
+                params=None,
+                ml_agent=None,
+                observer=None):
     super(LeftLaneCorridorConfig, self).__init__(road_ids,
                                                  lane_corridor_id,
                                                  params)
+    self._ml_agent = ml_agent
+    self._observer = observer
 
   def position(self, world, min_s=10., max_s=150.):
     return super(LeftLaneCorridorConfig, self).position(world, min_s, max_s)
@@ -33,7 +37,7 @@ class LeftLaneCorridorConfig(LaneCorridorConfig):
   
   def controlled_goal(self, world):
     road_corr = world.map.GetRoadCorridor(self._road_ids, XodrDrivingDirection.forward)
-    lane_corr = road_corr.lane_corridors[1]
+    lane_corr = road_corr.lane_corridors[0]
     return GoalDefinitionStateLimitsFrenet(lane_corr.center_line,
                                             (0.4, 0.4),
                                             (0.1, 0.1),

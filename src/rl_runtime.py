@@ -36,13 +36,17 @@ class RuntimeRL(Runtime):
     super().reset(scenario=scenario)
     self._world = self._observer.reset(self._world)
     self._world = self._evaluator.reset(self._world)
+    idx_list = []
+    for idx, agent in self._world.agents.items():
+       idx_list.append(idx)
+    self._scenario._eval_agent_ids = np.random.choice(idx_list, 1)
     self._world = self._action_wrapper.reset(self._world,
                                              self._scenario._eval_agent_ids)
     
     # replace constant vel. models
     self._behavior_models = []
     for idx, agent in self._world.agents.items():
-      if isinstance(agent.behavior_model, BehaviorConstantVelocity) and idx != self._scenario._eval_agent_ids[0]:
+      if idx != self._scenario._eval_agent_ids[0]:
         self._behavior_models.append(BARKMLBehaviorModel(
               dynamic_model=SingleTrackModel(self._params),
               observer=self._observer,
