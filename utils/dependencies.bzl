@@ -6,18 +6,18 @@ def _maybe(repo_rule, name, **kwargs):
         repo_rule(name = name, **kwargs)
 
 def barkml_deps():
-  # _maybe(
-  #   native.local_repository,
-  #   name = "bark_project",
-  #   path="/Users/hart/2019/bark",
-  # )
-  
   _maybe(
-    git_repository,
+    native.local_repository,
     name = "bark_project",
-    branch="polymorph_behavior",
-    remote = "https://github.com/bark-simulator/bark",
+    path="/home/chenyang/Documents/bark",
   )
+  
+  # _maybe(
+  #   git_repository,
+  #   name = "bark_project",
+  #   branch="polymorph_behavior",
+  #   remote = "https://github.com/bark-simulator/bark",
+  # )
 
   _maybe(
     git_repository,

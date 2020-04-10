@@ -42,6 +42,8 @@ class SACRunner(TFARunner):
     # collect initial episodes
     self.collect_initial_episodes()
     # main training cycle
+    self._summary_writer = tf.summary.create_file_writer(
+          self._params["BaseDir"] + "/" + self._params["ML"]["Runner"]["summary_path"])
     if self._summary_writer is not None:
       with self._summary_writer.as_default():
         self._train()

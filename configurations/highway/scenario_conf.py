@@ -38,10 +38,15 @@ class LeftLaneCorridorConfig(LaneCorridorConfig):
   def controlled_goal(self, world):
     road_corr = world.map.GetRoadCorridor(self._road_ids, XodrDrivingDirection.forward)
     lane_corr = road_corr.lane_corridors[0]
-    return GoalDefinitionStateLimitsFrenet(lane_corr.center_line,
+    goal = GoalDefinitionStateLimitsFrenet(lane_corr.center_line,
                                             (0.4, 0.4),
                                             (0.1, 0.1),
                                             (10., 15.))
+    sequential_goals = []                                
+    for _ in range(10):
+      sequential_goals.append(goal)
+    sequential_goal = GoalDefinitionSequential(sequential_goals)
+    return sequential_goal
 
   def controlled_ids(self, agent_list):
     return []
@@ -69,10 +74,15 @@ class RightLaneCorridorConfig(LaneCorridorConfig):
   def controlled_goal(self, world):
     road_corr = world.map.GetRoadCorridor(self._road_ids, XodrDrivingDirection.forward)
     lane_corr = road_corr.lane_corridors[0]
-    return GoalDefinitionStateLimitsFrenet(lane_corr.center_line,
+    goal = GoalDefinitionStateLimitsFrenet(lane_corr.center_line,
                                             (0.4, 0.4),
                                             (0.1, 0.1),
                                             (10., 15.))
+    sequential_goals = []                                
+    for _ in range(10):
+      sequential_goals.append(goal)
+    sequential_goal = GoalDefinitionSequential(sequential_goals)
+    return sequential_goal
 
   @property
   def behavior_model(self):

@@ -86,7 +86,7 @@ class SACAgent(TFAAgent):
       gradient_clipping=self._params["ML"]["Agent"]["gradient_clipping"],
       train_step_counter=self._ckpt.step,
       name=self._params["ML"]["Agent"]["agent_name"],
-      debug_summaries=self._params["ML"]["Agent"]["debug_summaries", "", False])
+      debug_summaries=True)
     tf_agent.initialize()
     return tf_agent
 

@@ -32,7 +32,7 @@ class CustomEvaluator(GoalReached):
 
     ego_agent = observed_world.ego_agent
     goal_def = ego_agent.goal_definition
-    goal_center_line = goal_def.center_line
+    goal_center_line = goal_def.sequential_goals[0].center_line
     ego_agent_state = ego_agent.state
     lateral_offset = Distance(goal_center_line,
                               Point2d(ego_agent_state[1], ego_agent_state[2]))
