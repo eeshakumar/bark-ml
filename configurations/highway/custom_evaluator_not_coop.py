@@ -25,14 +25,11 @@ class CustomEvaluator(GoalReached):
     self._evaluators["collision"] = EvaluatorCollisionEgoAgent()
     self._evaluators["step_count"] = EvaluatorStepCount()
 
-  def reverse_norm(self, value, range):
-    return (value * (range[1]-range[0])) + range[0]
-
   def calculate_reward(self, observed_world, eval_results, action, observed_state):  # NOLINT
     success = eval_results["goal_reached"]
     collision = eval_results["collision"]
     drivable_area = eval_results["drivable_area"]
-    
+
     ego_agent = observed_world.ego_agent
     goal_def = ego_agent.goal_definition
     goal_center_line = goal_def.sequential_goals[0].center_line
@@ -40,15 +37,6 @@ class CustomEvaluator(GoalReached):
     lateral_offset = Distance(goal_center_line,
                               Point2d(ego_agent_state[1], ego_agent_state[2]))
 
-    bb = observed_world.bounding_box
-    x_range = [bb[0].x(), bb[1].x()]
-    y_range = [bb[0].y(), bb[1].y()]
-    nearest_state_x = self.reverse_norm(observed_state[4], x_range)
-    nearest_state_y = self.reverse_norm(observed_state[5], y_range)
-    minimal_dist = (nearest_state_x - ego_agent_state[1])**2 + \
-                    (nearest_state_y - ego_agent_state[2])**2
-    if minimal_dist - 30 > 0: minimal_dist = 30
-    
     actions = np.reshape(action, (-1, 2))
     accs = actions[:, 0]
     delta = actions[:, 1]
@@ -57,7 +45,7 @@ class CustomEvaluator(GoalReached):
     reward = collision * self._collision_penalty + \
       success * self._goal_reward + \
       drivable_area * self._collision_penalty - \
-      0.01*lateral_offset**2 + 0.01*inpt_reward - 0.01*(30 - minimal_dist)
+      0.01*lateral_offset**2 + 0.01*inpt_reward
     return reward
 
   def _evaluate(self, observed_world, eval_results, action, observed_state):
