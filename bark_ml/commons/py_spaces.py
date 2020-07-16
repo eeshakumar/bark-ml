@@ -53,12 +53,16 @@ class BoundedContinuous(Space):
     Space.__init__(self, shape=(n,))
 
   def sample(self):
-    if len(self._low) > 1 and len(self._high) > 1:
-      sample_vec = []
-      for mi, ma in zip(self._low, self._high):
-        sample_vec.append(self.np_random.uniform(mi, ma))
-      return np.hstack(sample_vec)
-    return self.np_random.uniform(size=(self._n,))
+    # if len(self._low) > 1 and len(self._high) > 1:
+    #   sample_vec = []
+    #   print("BOUNDS", self._low, self._high)
+    #   for mi, ma in zip(self._low, self._high):
+    #     sample_vec.append(self.np_random.uniform(mi, ma))
+    #     break
+    #   print(sample_vec)
+    #   return np.hstack(sample_vec)
+    # return self.np_random.uniform(0, self._n, size=(1,))
+    return self.np_random.randint(self._n)
 
   @property
   def low(self):

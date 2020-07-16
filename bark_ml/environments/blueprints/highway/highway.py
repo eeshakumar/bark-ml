@@ -18,6 +18,9 @@ from bark.core.world.goal_definition import GoalDefinitionStateLimitsFrenet
 from bark_ml.environments.blueprints.blueprint import Blueprint
 from bark_ml.evaluators.goal_reached import GoalReached
 from bark_ml.behaviors.cont_behavior import BehaviorContinuousML
+from bark_ml.behaviors.discrete_behavior import BehaviorDiscreteMotionPrimitivesML, \
+        BehaviorDiscreteMacroActionsML
+from bark_ml.observers.nearest_state_observer import NearestAgentsObserver
 from bark_ml.behaviors.discrete_behavior import BehaviorDiscreteML
 from bark_ml.core.observers import NearestObserver
 
@@ -73,7 +76,7 @@ class HighwayBlueprint(Blueprint):
                         follow_agent_id=True)
     dt = 0.2
     evaluator = GoalReached(params)
-    observer = NearestObserver(params)
+    observer = NearestAgentsObserver(params)
     ml_behavior = ml_behavior
 
     super().__init__(
@@ -104,9 +107,8 @@ class DiscreteHighwayBlueprint(HighwayBlueprint):
   def __init__(self,
                params=None,
                number_of_senarios=25,
-               random_seed=0,
-               viewer=True):
-    ml_behavior = BehaviorDiscreteML(params)
+               random_seed=0):
+    ml_behavior = BehaviorDiscreteMacroActionsML(params)
     HighwayBlueprint.__init__(self,
                               params=params,
                               number_of_senarios=number_of_senarios,
