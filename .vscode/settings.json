@@ -91,5 +91,12 @@
     "__functional_03": "cpp",
     "*.ipp": "cpp"
   },
-  "python.pythonPath": "${workspaceFolder}/python/venv/bin/python",
+  "python.pythonPath": "${workspaceFolder}/bark_ml/python_wrapper/venv/bin/python",
+  "python.linting.enabled": true,
+  "python.linting.pylintEnabled": true,
+  "python.linting.pylintArgs": [
+    "--generated-members=torch.*",
+    "--indent-string=\"  \""
+    ]
+  
 }
