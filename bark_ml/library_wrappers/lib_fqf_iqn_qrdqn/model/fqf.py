@@ -32,7 +32,7 @@ class FQF(BaseModel):
     self._num_actions = num_actions
     self._num_cosines = num_cosines
     self._noisy_net = noisy_net
-    self._target = params["ML"]["FQFModel"]["Target", "", False]
+    self._target = params["ML"]["FQFModel"]["Target", "", target]
     self._embedding_dim = params["ML"]["FQFModel"]["EmbeddingDims", "", 512]
 
     # Feature extractor of DQN.
@@ -50,7 +50,7 @@ class FQF(BaseModel):
                                          embedding_dim=self._embedding_dim)
 
     # Fraction proposal network.
-    if not target:
+    if not self._target:
       self._fraction_net = FractionProposalNetwork(
           N=N, embedding_dim=self._embedding_dim)
 
@@ -73,7 +73,7 @@ class FQF(BaseModel):
   def calculate_state_embeddings(self, states):
     return self._dqn_net(states)
 
-  def calculate_fractions(self, state_embeddings):
+  def calculate_fractions(self, state_embeddings, fraction_net=None):
     assert state_embeddings is not None
     assert not self._target or self._fraction_net is not None
 
@@ -95,7 +95,8 @@ class FQF(BaseModel):
                   taus=None,
                   tau_hats=None,
                   states=None,
-                  state_embeddings=None):
+                  state_embeddings=None,
+                  fraction_net=None):
     assert states is not None or state_embeddings is not None
     assert not self._target or self.fraction_net is not None
 
@@ -107,10 +108,10 @@ class FQF(BaseModel):
     # Calculate fractions.
     if taus is None or tau_hats is None:
       taus, tau_hats, _ = self.calculate_fractions(
-          state_embeddings=state_embeddings)
+          state_embeddings=state_embeddings, fraction_net=fraction_net)
 
     # Calculate quantiles.
-    quantile_hats = self._calculate_quantiles(tau_hats,
+    quantile_hats = self.calculate_quantiles(tau_hats,
                                               state_embeddings=state_embeddings)
     assert quantile_hats.shape == (batch_size, self._N, self._num_actions)
 

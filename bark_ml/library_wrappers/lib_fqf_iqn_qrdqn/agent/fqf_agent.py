@@ -148,7 +148,7 @@ class FQFAgent(BaseAgent):
       self._writer.add_scalar('stats/mean_entropy_of_value_distribution',
                               entropies.mean().detach().item(), 4 * self._steps)
 
-  def calculate_fraction_loss(self, state_embeddings, sa_quantile_hats, taus,
+  def _calculate_fraction_loss(self, state_embeddings, sa_quantile_hats, taus,
                               actions, weights):
     assert not state_embeddings.requires_grad
     assert not sa_quantile_hats.requires_grad
@@ -193,7 +193,7 @@ class FQFAgent(BaseAgent):
 
     return fraction_loss
 
-  def calculate_quantile_loss(self, tau_hats, current_sa_quantile_hats, rewards,
+  def _calculate_quantile_loss(self, tau_hats, current_sa_quantile_hats, rewards,
                               next_states, dones, weights):
     assert not tau_hats.requires_grad
 
@@ -212,7 +212,8 @@ class FQFAgent(BaseAgent):
          self._target_net.calculate_state_embeddings(next_states)
         next_q = \
          self._target_net.calculate_q(
-          state_embeddings=next_state_embeddings)
+          state_embeddings=next_state_embeddings,
+          fraction_net=self._online_net.fraction_net)
 
       # Calculate greedy actions.
       next_actions = torch.argmax(next_q, dim=1, keepdim=True)

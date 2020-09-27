@@ -116,6 +116,10 @@ class BaseAgent(BehaviorModel):
           self._params["ML"]["BaseAgent"]["Gamma", "", 0.99],
           self._params["ML"]["BaseAgent"]["Multi_step", "", 1])
 
+  @property
+  def env(self):
+    return self._env
+
   def train(self):
     while True:
       self.train_episode()
@@ -202,8 +206,8 @@ class BaseAgent(BehaviorModel):
                os.path.join(save_dir, 'online_net.pth'))
     torch.save(self._target_net.state_dict(),
                os.path.join(save_dir, 'target_net.pth'))
-    online_net_script = torch.jit.script(self._online_net)
-    online_net_script.save(os.path.join(save_dir, 'online_net_script.pt'))
+    # online_net_script = torch.jit.script(self._online_net)
+    # online_net_script.save(os.path.join(save_dir, 'online_net_script.pt'))
 
   def load_models(self, save_dir):
     self._online_net.load_state_dict(
