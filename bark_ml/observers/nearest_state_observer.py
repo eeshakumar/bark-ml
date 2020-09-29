@@ -31,7 +31,7 @@ class NearestAgentsObserver(StateObserver):
       "other agents are seen, remaining concatenation state is set to zero",
       100]
 
-  def Observe(self, observed_world):
+  def Observe(self, observed_world, is_ret_agent_idx_nearest=False):
     """see base class
     """
     ego_observed_world = observed_world
@@ -49,7 +49,6 @@ class NearestAgentsObserver(StateObserver):
         agent.state[int(StateDefinition.Y_POSITION)]
       dist =  dx**2 + dy**2
       nearest_distances[dist] = agent_id
-
     # preallocate np.array and add ego state
     concatenated_state = np.zeros(self._len_ego_state + \
       self._max_num_vehicles*self._len_relative_agent_state)
@@ -60,6 +59,7 @@ class NearestAgentsObserver(StateObserver):
     concat_pos = self._len_relative_agent_state
     nearest_distances = sorted(nearest_distances.items(),
                                key=operator.itemgetter(0))
+    agent_ids_by_nearest = list(map(operator.itemgetter(1), nearest_distances))
     for agent_idx in range(0, self._max_num_vehicles):
       if agent_idx<len(nearest_distances) and \
         nearest_distances[agent_idx][0] <= self._max_distance_other_agents**2:
@@ -71,10 +71,14 @@ class NearestAgentsObserver(StateObserver):
         concatenated_state[concat_pos:concat_pos + \
           self._len_relative_agent_state] = agent_rel_state
       else:
+        agent_id = nearest_distances[agent_idx][1]
+        agent_ids_by_nearest.remove(agent_id)
         concatenated_state[concat_pos:concat_pos + \
           self._len_relative_agent_state] = \
             np.zeros(self._len_relative_agent_state)
       concat_pos += self._len_relative_agent_state
+    if is_ret_agent_idx_nearest:
+      return concatenated_state, agent_ids_by_nearest
     return concatenated_state
 
   @property
