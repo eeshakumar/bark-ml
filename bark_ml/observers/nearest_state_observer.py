@@ -60,6 +60,7 @@ class NearestAgentsObserver(StateObserver):
     nearest_distances = sorted(nearest_distances.items(),
                                key=operator.itemgetter(0))
     agent_ids_by_nearest = list(map(operator.itemgetter(1), nearest_distances))
+    agent_ids_by_nearest = agent_ids_by_nearest[:self._max_num_vehicles]
     for agent_idx in range(0, self._max_num_vehicles):
       if agent_idx<len(nearest_distances) and \
         nearest_distances[agent_idx][0] <= self._max_distance_other_agents**2:
@@ -71,8 +72,6 @@ class NearestAgentsObserver(StateObserver):
         concatenated_state[concat_pos:concat_pos + \
           self._len_relative_agent_state] = agent_rel_state
       else:
-        agent_id = nearest_distances[agent_idx][1]
-        agent_ids_by_nearest.remove(agent_id)
         concatenated_state[concat_pos:concat_pos + \
           self._len_relative_agent_state] = \
             np.zeros(self._len_relative_agent_state)
