@@ -391,7 +391,8 @@ class BaseAgent(BehaviorModel):
         logging.info(f"Reward: {reward:<4}")
 
       # To calculate efficiently, I just set priority=max_priority here.
-      self.memory.append(state, action, reward, next_state, done)
+      # TODO: remove hardcoding that samples are demo samples
+      self.memory.append(state, action, reward, next_state, done, True)
 
       self.steps += 1
       episode_steps += 1
