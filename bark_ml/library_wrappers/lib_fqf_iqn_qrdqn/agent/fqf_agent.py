@@ -84,7 +84,7 @@ class FQFAgent(BaseAgent):
     self.target_net.sample_noise()
 
     if self.use_per:
-      (states, actions, rewards, next_states, dones), weights = \
+      (states, actions, rewards, next_states, dones, is_demos), weights = \
        self.memory.sample(self.batch_size)
     else:
       states, actions, rewards, next_states, dones = \

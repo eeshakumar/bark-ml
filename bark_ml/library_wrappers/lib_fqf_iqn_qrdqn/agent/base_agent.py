@@ -18,6 +18,7 @@ from abc import ABC, abstractmethod
 # BARK-ML imports
 from bark_ml.library_wrappers.lib_fqf_iqn_qrdqn.utils import RunningMeanStats, LinearAnneaer
 from bark_ml.library_wrappers.lib_fqf_iqn_qrdqn.memory import LazyMultiStepMemory, LazyPrioritizedMultiStepMemory
+from bark_ml.library_wrappers.lib_fqf_iqn_qrdqn.memory import LazyPrioritizedDemMultiStepMemory
 from bark_ml.behaviors.discrete_behavior import BehaviorDiscreteMacroActionsML
 
 # BARK imports
@@ -98,13 +99,16 @@ class BaseAgent(BehaviorModel):
     if self.use_per:
       beta_steps = (self.num_steps - self.start_steps) / \
              self.update_interval
-      self.memory = LazyPrioritizedMultiStepMemory(
+      print("Initializing Prioritized experience replay memory for demonstrator actions")
+      self.memory = LazyPrioritizedDemMultiStepMemory(
           self._params["ML"]["BaseAgent"]["MemorySize", "", 10**6],
           self.env.observation_space.shape,
           self.device,
           self._params["ML"]["BaseAgent"]["Gamma", "", 0.99],
           self._params["ML"]["BaseAgent"]["Multi_step", "", 1],
-          beta_steps=beta_steps)
+          beta_steps=beta_steps,
+          epsilon_demo=self._params["ML"]["Demonstrator"]["EpsilonDemo", "", 0.01],
+          epsilon_alpha=self._params["ML"]["Demonstrator"]["EpsilonAlpha", "", 0.1])
     else:
       self.memory = LazyMultiStepMemory(
           self._params["ML"]["BaseAgent"]["MemorySize", "", 10**6],
@@ -246,7 +250,8 @@ class BaseAgent(BehaviorModel):
         logging.info(f"Reward: {reward:<4}")
 
       # To calculate efficiently, I just set priority=max_priority here.
-      self.memory.append(state, action, reward, next_state, done)
+      # TODO: remove hardcoding that samples are demo samples
+      self.memory.append(state, action, reward, next_state, done, True)
 
       self.steps += 1
       episode_steps += 1
@@ -323,6 +328,6 @@ class BaseAgent(BehaviorModel):
     logging.info('-' * 60)
 
   def __del__(self):
-    # self.env.close()
-    # self.test_env.close()
+    self.env.close()
+    self.test_env.close()
     self.writer.close()
