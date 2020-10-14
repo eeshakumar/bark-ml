@@ -112,7 +112,9 @@ class BaseAgent(BehaviorModel):
           per_beta=self._params["ML"]["Demonstrator"]["PerBeta", "This param specifies the importance sampling weight",
                                                       0.6],
           per_beta_steps=self._params["ML"]["Demonstrator"]["PerBetaSteps", "This param specifies the number of steps to update beta",
-                                                            25000])
+                                                            25000],
+          demo_ratio=self._params["ML"]["Demonstrator"]["DemoRatio", "This param specifies what proportion of capacity is for demo samples",
+                                                        0.25])
     else:
       self.memory = LazyMultiStepMemory(
           self._params["ML"]["BaseAgent"]["MemorySize", "", 10**6],

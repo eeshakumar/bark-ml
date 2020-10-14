@@ -20,8 +20,9 @@ class LazyPrioritizedDemMultiStepMemory(LazyDemMultiStepMemory):
                  epsilon_demo=1.0,
                  epsilon_alpha=0.001,
                  per_beta=0.6,
-                 per_beta_steps=25000):
-        super().__init__(capacity, state_shape, device, gamma, multi_step)
+                 per_beta_steps=25000,
+                 demo_ratio=0.25):
+        super().__init__(capacity, state_shape, device, gamma, multi_step, demo_ratio)
 
         self.alpha = alpha
         self.beta = beta
