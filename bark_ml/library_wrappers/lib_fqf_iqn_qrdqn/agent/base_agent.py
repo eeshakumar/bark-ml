@@ -107,8 +107,12 @@ class BaseAgent(BehaviorModel):
           self._params["ML"]["BaseAgent"]["Gamma", "", 0.99],
           self._params["ML"]["BaseAgent"]["Multi_step", "", 1],
           beta_steps=beta_steps,
-          epsilon_demo=self._params["ML"]["Demonstrator"]["EpsilonDemo", "", 0.01],
-          epsilon_alpha=self._params["ML"]["Demonstrator"]["EpsilonAlpha", "", 0.1])
+          epsilon_demo=self._params["ML"]["Demonstrator"]["EpsilonDemo", "", 1.0],
+          epsilon_alpha=self._params["ML"]["Demonstrator"]["EpsilonAlpha", "", 0.001],
+          per_beta=self._params["ML"]["Demonstrator"]["PerBeta", "This param specifies the importance sampling weight",
+                                                      0.6],
+          per_beta_steps=self._params["ML"]["Demonstrator"]["PerBetaSteps", "This param specifies the number of steps to update beta",
+                                                            25000])
     else:
       self.memory = LazyMultiStepMemory(
           self._params["ML"]["BaseAgent"]["MemorySize", "", 10**6],
@@ -251,7 +255,10 @@ class BaseAgent(BehaviorModel):
 
       # To calculate efficiently, I just set priority=max_priority here.
       # TODO: remove hardcoding that samples are demo samples
-      self.memory.append(state, action, reward, next_state, done, True)
+      import random
+      is_demo = random.getrandbits(1)
+      # print("IS DEMO", is_demo)
+      self.memory.append(state, action, reward, next_state, done, is_demo)
 
       self.steps += 1
       episode_steps += 1
@@ -274,6 +281,9 @@ class BaseAgent(BehaviorModel):
 
   def train_step_interval(self):
     self.epsilon_train.step()
+    # print("Train Step Interval", self.steps)
+    self.memory.per_beta.step()
+    # print("Stepped Per Beta", self.memory.per_beta.get())
 
     if self.steps % self.target_update_interval == 0:
       self.update_target()

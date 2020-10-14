@@ -84,8 +84,10 @@ class FQFAgent(BaseAgent):
     self.target_net.sample_noise()
 
     if self.use_per:
+      # print("Sample")
       (states, actions, rewards, next_states, dones, is_demos), weights = \
        self.memory.sample(self.batch_size)
+      # print("Sampled demos", is_demos, weights)
     else:
       states, actions, rewards, next_states, dones = \
        self.memory.sample(self.batch_size)
@@ -134,7 +136,7 @@ class FQFAgent(BaseAgent):
                   grad_cliping=self.grad_cliping)
 
     if self.use_per:
-      self.memory.update_priority(errors)
+      self.memory.update_priority(errors, is_demos)
 
     if self.learning_steps % self.summary_log_interval == 0:
       self.writer.add_scalar('loss/fraction_loss',
