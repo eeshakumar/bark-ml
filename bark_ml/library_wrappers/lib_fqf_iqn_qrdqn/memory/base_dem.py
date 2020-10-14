@@ -116,8 +116,9 @@ class LazyDemMemory(LazyMemory):
 
 
 class LazyDemMultiStepMemory(LazyDemMemory):
-    def __init__(self, capacity, state_shape, device, gamma=0.99, multi_step=3):
-        super().__init__(capacity, state_shape, device)
+    def __init__(self, capacity, state_shape, device, gamma=0.99,
+                 multi_step=3, demo_ratio=0.25):
+        super().__init__(capacity, state_shape, device, demo_ratio)
 
         self.gamma = gamma
         self.multi_step = int(multi_step)
