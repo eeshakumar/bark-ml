@@ -40,7 +40,7 @@ class LazyDemMemory(LazyMemory):
         self.demo_capacity = int(demo_ratio*capacity)
         self.agent_capacity = capacity - self.demo_capacity
         self._dn = 0
-        self._an = 0
+        self._an = self.an_start = self.demo_capacity
 
     def reset(self, is_demo=True):
         super().reset()
@@ -58,6 +58,7 @@ class LazyDemMemory(LazyMemory):
     def _append(self, state, action, reward, next_state, done, is_demo):
         # print("_append")
         if is_demo:
+            # print("DN", self._dn)
             # print("D ST , MEM ST", state.shape, self['state'].shape, self['state'][self._dn].shape)
             self['state'][self._dn] = state
             self['next_state'][self._dn] = next_state
@@ -66,8 +67,8 @@ class LazyDemMemory(LazyMemory):
             self['done'][self._dn] = done
             self['is_demo'][self._dn] = is_demo
             self._dn = (self._dn + 1) % self.demo_capacity
+            # print("DN AF", self._dn)
         else:
-            self._an = (self.demo_capacity + self._an)
             # print("ND ST , MEM ST", state.shape, self['state'].shape, self['state'][self._an].shape)
             self['state'][self._an] = state
             self['next_state'][self._an] = next_state
@@ -75,7 +76,12 @@ class LazyDemMemory(LazyMemory):
             self['reward'][self._an] = reward
             self['done'][self._an] = done
             self['is_demo'][self._an] = is_demo
-            self._an = (self._an + 1) % self.agent_capacity
+            # print("AN", self._an)
+            if self._an - self.an_start >= self.agent_capacity:
+                self._an = self.demo_capacity
+            else:
+                self._an = (self._an + 1)
+            # print("AN AF", self._an)
 
         # self['state'].append(state)
         # self['next_state'].append(next_state)
@@ -92,6 +98,7 @@ class LazyDemMemory(LazyMemory):
         self.truncate()
 
     def _sample(self, indices, batch_size):
+        # print("Sampling Indices", indices)
         bias = -self._p if self._n == self.capacity else 0
         # print('Bias', bias)
         states = np.empty((batch_size, *self.state_shape), dtype=np.uint8)
@@ -100,13 +107,17 @@ class LazyDemMemory(LazyMemory):
         # print("Sample Indices", indices)
         for i, index in enumerate(indices):
             # print("index", index)
+            # bias is annealed in importance sampling, so there is no use for it here
             _index = np.mod(index + bias, self.capacity)
+            # print("Biased Sampling indices", _index)
             # print("_index", _index)
             states[i, ...] = self['state'][index]
             next_states[i, ...] = self['next_state'][index]
 
+        # print("BEF DIVISION", states, next_states)
         states = torch.ByteTensor(states).to(self.device).float() / 255.
         next_states = torch.ByteTensor(next_states).to(self.device).float() / 255.
+        # print("After DIVISION", states, next_states)
         actions = torch.LongTensor(self['action'][indices]).to(self.device)
         rewards = torch.FloatTensor(self['reward'][indices]).to(self.device)
         dones = torch.FloatTensor(self['done'][indices]).to(self.device)
