@@ -47,7 +47,9 @@ class LazyPrioritizedDemMultiStepMemory(LazyDemMultiStepMemory):
     def _pa(self, p, is_demos):
         # take epsilon_demo when is_demo is 1, else take epsilon_alpha
         eps = self.eps + self.epsilon_demo * is_demos + self.epsilon_alpha * (1.0 - is_demos)
+        # print("Epsilon for priority and p", eps, p)
         clipped_p =  np.clip((p + eps) ** self.alpha, self.min_pa, self.max_pa)
+        # print("Clipped priority", clipped_p)
         return clipped_p
 
     def append(self, state, action, reward, next_state, done, is_demo, p=None):
@@ -85,8 +87,11 @@ class LazyPrioritizedDemMultiStepMemory(LazyDemMultiStepMemory):
 
     def _sample_idxes(self, batch_size):
         total_pa = self.it_sum.sum(0, self._n)
+        # print("TOtal pa", total_pa)
         rands = np.random.rand(batch_size) * total_pa
+        # print(rands)
         # print("Rands", rands, [self.it_sum.find_prefixsum_idx(r) for r in rands])
+        # print([self.it_sum.find_prefixsum_idx(r) for r in rands])
         indices = [self.it_sum.find_prefixsum_idx(r) for r in rands]
         self.beta = min(1., self.beta + self.beta_diff)
         return indices
@@ -104,17 +109,20 @@ class LazyPrioritizedDemMultiStepMemory(LazyDemMultiStepMemory):
         # weights = [(self.it_sum[i] / min_pa)**-self.beta for i in indices]
         # print("INDICES", indices, "STORED PRIORITIES", [self.it_sum[i] for i in indices])
         weights = [(self.it_sum[i] * self._n) ** -self.per_beta.get() for i in indices]
+        # print("Weights", weights)
         return torch.FloatTensor(weights).to(self.device).view(-1, 1)
 
     def update_priority(self, errors, is_demos):
         #TODO: change priority equation.
         assert self._cached is not None
-
+        # print("Is demos passed", is_demos)
         is_demos_expanded = torch.zeros(errors.shape)
         for i in range(is_demos.shape[0]):
             is_demos_expanded[i,:,:] = is_demos[i]
         ps = errors.detach().cpu().abs().numpy().flatten()
+        # print("Errors detatched", ps)
         is_demos = is_demos_expanded.detach().cpu().numpy().flatten()
+        # print("Is demos detatched", is_demos)
         assert ps.shape == is_demos.shape
         pas = self._pa(ps, is_demos)
         self.per_prio_max = max(pas.max(), self.per_prio_max)
@@ -125,4 +133,5 @@ class LazyPrioritizedDemMultiStepMemory(LazyDemMultiStepMemory):
             self.it_sum[index] = pa
             self.it_min[index] = pa
 
+        # print("Updated Priorities", pas)
         self._cached = None

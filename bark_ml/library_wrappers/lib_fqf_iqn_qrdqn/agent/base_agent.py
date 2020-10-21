@@ -397,7 +397,7 @@ class BaseAgent(BehaviorModel):
       import random
       is_demo = random.getrandbits(1)
       # print("IS DEMO", is_demo)
-      self.memory.append(state, action, reward, next_state, done, is_demo)
+      self.memory.append(state, action, reward, next_state, done, True)
 
       self.steps += 1
       episode_steps += 1
