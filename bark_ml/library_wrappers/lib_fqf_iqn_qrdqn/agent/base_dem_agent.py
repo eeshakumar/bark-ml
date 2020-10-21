@@ -1,3 +1,5 @@
+import numpy as np
+import os
 import torch
 
 
@@ -47,7 +49,6 @@ class BaseDemonstratedAgent(object):
         self.online_net.train()
         self.target_net.train()
 
-
         done = False
 
         for k in self.pre_training_steps:
@@ -79,6 +80,9 @@ class BaseDemonstratedAgent(object):
             else:
                 print("Demonstration capacity full, truncated.")
                 break
+        # TODO: Can be moved to invoking and stored in params
+        filename = os.path.join(self._params["Experiment"]["dir"], "demonstrations")
+        self.store_demonstrations(filename, demonstrations)
 
     def calculate_large_margin_loss(self):
         # TODO: Implement large margin loss, entry from train_episode
@@ -90,4 +94,9 @@ class BaseDemonstratedAgent(object):
         return
 
     def calculate_l2_reg_loss(self):
+        # get network weights and calculate loss
         return
+
+    def store_demonstrations(self, filename, demonstrations):
+        with open(filename, "wb+") as f:
+            np.save(f, np.asarray(demonstrations))

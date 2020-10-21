@@ -10,6 +10,11 @@ class FQFDemonstratedAgent(BaseDemonstratedAgent, FQFAgent):
             assert demonstrator is not None, "Demonstrator needed for offline training"
             BaseDemonstratedAgent.__init__(env, test_env, params, demonstrator)
 
+    def load_demonstrations(self, filename):
+        # import pickle
+        # with open(filename, "r+") as f:
+        #     return pickle.load(f)
+
 
     def train_episode(self):
         # append self generated samples
@@ -17,6 +22,7 @@ class FQFDemonstratedAgent(BaseDemonstratedAgent, FQFAgent):
 
     def run(self):
         # fill memory with demonstrator samples
+        dem_samples =
 
         return
 
