@@ -31,10 +31,9 @@ class BaseAgent(BehaviorModel):
   def __init__(self, env, test_env, params, bark_behavior=None):
     BehaviorModel.__init__(self, params)
     self._params = params
-    self._env = env
-    self._test_env = test_env
-    self._bark_behavior_model = bark_behavior or BehaviorDiscreteMacroActionsML(
-        params)
+    self.env = env
+    self.test_env = test_env
+    self._bark_behavior_model = bark_behavior or self.env._ml_behavior
 
     self._device = torch.device("cuda" if self._params["ML"]["BaseAgent"][
         "Cuda", "", True] and torch.cuda.is_available() else "cpu")
