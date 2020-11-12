@@ -11,7 +11,7 @@ class BaseModel(nn.Module):
     super(BaseModel, self).__init__()
 
   def sample_noise(self):
-    if self._noisy_net:
+    if self.noisy_net:
       for m in self.modules():
         if isinstance(m, NoisyLinear):
           m.sample()

@@ -233,26 +233,26 @@ class BaseAgent(BehaviorModel):
   def train(self):
     while True:
       self.train_episode()
-      if self.steps > self._num_steps:
+      if self.steps > self.num_steps:
         break
-    self._set_action_externally = True
+    self.set_action_externally = True
 
   def is_update(self):
-    return self.steps % self._update_interval == 0 \
-        and self.steps >= self._start_steps
+    return self.steps % self.update_interval == 0 \
+        and self.steps >= self.start_steps
 
   def is_random(self, eval=False):
     # Use e-greedy for evaluation.
-    if self.steps < self._start_steps:
+    if self.steps < self.start_steps:
       return True
     if eval:
-      return np.random.rand() < self._epsilon_eval
-    if self._noisy_net:
+      return np.random.rand() < self.epsilon_eval
+    if self.noisy_net:
       return False
-    return np.random.rand() < self._epsilon_train.get()
+    return np.random.rand() < self.epsilon_train.get()
 
   def update_target(self):
-    self._target_net.load_state_dict(self._online_net.state_dict())
+    self.target_net.load_state_dict(self.online_net.state_dict())
 
   def explore(self):
     # Act with randomness.
@@ -261,11 +261,11 @@ class BaseAgent(BehaviorModel):
 
   @property
   def set_action_externally(self):
-    return self._set_action_externally
+    return self.set_action_externally
 
   @set_action_externally.setter
   def set_action_externally(self, externally):
-    self._set_action_externally = externally
+    self.set_action_externally = externally
 
   def ActionToBehavior(self, action):
     # NOTE: will either be set externally or internally
@@ -279,14 +279,14 @@ class BaseAgent(BehaviorModel):
 
   def calculate_actions(self, state):
     # Act without randomness.
-    state = torch.Tensor(state).unsqueeze(0).to(self._device).float()
+    state = torch.Tensor(state).unsqueeze(0).to(self.device).float()
     with torch.no_grad():
-      actions = self._online_net(states=state)  # pylint: disable=not-callable
+      actions = self.online_net(states=state)  # pylint: disable=not-callable
     return actions
 
   def Plan(self, dt, observed_world):
     # NOTE: if training is enabled the action is set externally
-    if not self._set_action_externally:
+    if not self.set_action_externally:
       observed_state = self.observer.Observe(observed_world)
       action = self.Act(observed_state)
       self._action = action
@@ -364,8 +364,8 @@ class BaseAgent(BehaviorModel):
         state = next_state
 
   def train_episode(self):
-    self._online_net.train()
-    self._target_net.train()
+    self.online_net.train()
+    self.target_net.train()
 
     self.episodes += 1
     episode_return = 0.
@@ -374,11 +374,11 @@ class BaseAgent(BehaviorModel):
     done = False
     state = self._env.reset()
 
-    while (not done) and episode_steps <= self._max_episode_steps:
+    while (not done) and episode_steps <= self.max_episode_steps:
       # NOTE: Noises can be sampled only after self._learn(). However, I
       # sample noises before every action, which seems to lead better
       # performances.
-      self._online_net.sample_noise()
+      self.online_net.sample_noise()
 
       if self.is_random(eval=False):
         action = self.explore()
@@ -386,12 +386,12 @@ class BaseAgent(BehaviorModel):
         action = self.Act(state)
 
       next_state, reward, done, _ = self._env.step(action)
-      if self.episodes % self._reward_log_interval == 0:
+      if self.episodes % self.reward_log_interval == 0:
         # self._env.render()
         logging.info(f"Reward: {reward:<4}")
 
       # To calculate efficiently, I just set priority=max_priority here.
-      self._memory.append(state, action, reward, next_state, done)
+      self.memory.append(state, action, reward, next_state, done)
 
       self.steps += 1
       episode_steps += 1
@@ -401,11 +401,11 @@ class BaseAgent(BehaviorModel):
       self.train_step_interval()
 
     # We log running mean of stats.
-    self._train_return.append(episode_return)
+    self.train_return.append(episode_return)
 
     # We log evaluation results along with training frames = 4 * steps.
-    if self.episodes % self._summary_log_interval == 0:
-      self._writer.add_scalar('return/train', self._train_return.get(),
+    if self.episodes % self.summary_log_interval == 0:
+      self.writer.add_scalar('return/train', self.train_return.get(),
                               4 * self.steps)
 
     logging.info(f'Episode: {self.episodes:<4}  '
@@ -413,15 +413,15 @@ class BaseAgent(BehaviorModel):
                  f'return: {episode_return:<5.1f}')
 
   def train_step_interval(self):
-    self._epsilon_train.step()
+    self.epsilon_train.step()
 
-    if self.steps % self._target_update_interval == 0:
+    if self.steps % self.target_update_interval == 0:
       self.update_target()
 
     if self.is_update():
       self.learn()
 
-    if self.steps % self._eval_interval == 0:
+    if self.steps % self.eval_interval == 0:
       self.evaluate()
       self.save(os.path.join(self.model_dir, 'final'))
       self.online_net.train()
@@ -446,4 +446,4 @@ class BaseAgent(BehaviorModel):
     logging.info('-' * 60)
 
   def __del__(self):
-    self._writer.close()
+    self.writer.close()

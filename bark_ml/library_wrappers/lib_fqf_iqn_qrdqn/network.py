@@ -42,20 +42,20 @@ class DQNBase(nn.Module):
   def __init__(self, num_channels, hidden=512, embedding_dim=512):
     super(DQNBase, self).__init__()
 
-    self._net = nn.Sequential(
+    self.net = nn.Sequential(
         torch.nn.Linear(num_channels, hidden),
         torch.nn.ReLU(),
         torch.nn.Linear(hidden, embedding_dim),
     ).apply(initialize_weights_he)
 
-    self._embedding_dim = embedding_dim
+    self.embedding_dim = embedding_dim
 
   def forward(self, states):
     batch_size = states.shape[0]
 
     # Calculate embeddings of states.
-    state_embedding = self._net(states)
-    assert state_embedding.shape == (batch_size, self._embedding_dim)
+    state_embedding = self.net(states)
+    assert state_embedding.shape == (batch_size, self.embedding_dim)
 
     return state_embedding
 
@@ -65,20 +65,20 @@ class FractionProposalNetwork(nn.Module):
   def __init__(self, N=32, embedding_dim=7 * 7 * 64):
     super(FractionProposalNetwork, self).__init__()
 
-    self._net = nn.Sequential(
+    self.net = nn.Sequential(
         nn.Linear(embedding_dim,
                   N)).apply(lambda x: initialize_weights_xavier(x, gain=0.01))
 
-    self._N = N
-    self._embedding_dim = embedding_dim
+    self.N = N
+    self.embedding_dim = embedding_dim
 
   def forward(self, state_embeddings):
     batch_size = state_embeddings.shape[0]
 
     # Calculate (log of) probabilities q_i in the paper.
-    log_probs = F.log_softmax(self._net(state_embeddings), dim=1)
+    log_probs = F.log_softmax(self.net(state_embeddings), dim=1)
     probs = log_probs.exp()
-    assert probs.shape == (batch_size, self._N)
+    assert probs.shape == (batch_size, self.N)
 
     tau_0 = torch.zeros((batch_size, 1),
                         dtype=state_embeddings.dtype,
@@ -87,11 +87,11 @@ class FractionProposalNetwork(nn.Module):
 
     # Calculate \tau_i (i=0,...,N).
     taus = torch.cat((tau_0, taus_1_N), dim=1)
-    assert taus.shape == (batch_size, self._N + 1)
+    assert taus.shape == (batch_size, self.N + 1)
 
     # Calculate \hat \tau_i (i=0,...,N-1).
     tau_hats = (taus[:, :-1] + taus[:, 1:]).detach() / 2.
-    assert tau_hats.shape == (batch_size, self._N)
+    assert tau_hats.shape == (batch_size, self.N)
 
     # Calculate entropies of value distributions.
     entropies = -(log_probs * probs).sum(dim=-1, keepdim=True)
@@ -106,9 +106,9 @@ class CosineEmbeddingNetwork(nn.Module):
     super(CosineEmbeddingNetwork, self).__init__()
     linear = NoisyLinear if noisy_net else nn.Linear
 
-    self._net = nn.Sequential(linear(num_cosines, embedding_dim), nn.ReLU())
-    self._num_cosines = num_cosines
-    self._embedding_dim = embedding_dim
+    self.net = nn.Sequential(linear(num_cosines, embedding_dim), nn.ReLU())
+    self.num_cosines = num_cosines
+    self.embedding_dim = embedding_dim
 
   def forward(self, taus):
     batch_size = taus.shape[0]
@@ -116,17 +116,17 @@ class CosineEmbeddingNetwork(nn.Module):
 
     # Calculate i * \pi (i=1,...,N).
     i_pi = np.pi * torch.arange(start=1,
-                                end=self._num_cosines + 1,
+                                end=self.num_cosines + 1,
                                 dtype=taus.dtype,
                                 device=taus.device).view(
-                                    1, 1, self._num_cosines)
+                                    1, 1, self.num_cosines)
 
     # Calculate cos(i * \pi * \tau).
     cosines = torch.cos(taus.view(batch_size, N, 1) * i_pi).view(
-        batch_size * N, self._num_cosines)
+        batch_size * N, self.num_cosines)
 
     # Calculate embeddings of taus.
-    tau_embeddings = self._net(cosines).view(batch_size, N, self._embedding_dim)
+    tau_embeddings = self.net(cosines).view(batch_size, N, self.embedding_dim)
 
     return tau_embeddings
 
@@ -137,14 +137,14 @@ class QuantileNetwork(nn.Module):
     super(QuantileNetwork, self).__init__()
     linear = NoisyLinear if noisy_net else nn.Linear
 
-    self._net = nn.Sequential(
+    self.net = nn.Sequential(
         linear(embedding_dim, 512),
         nn.ReLU(),
         linear(512, num_actions),
     )
-    self._num_actions = num_actions
-    self._embedding_dim = embedding_dim
-    self._noisy_net = noisy_net
+    self.num_actions = num_actions
+    self.embedding_dim = embedding_dim
+    self.noisy_net = noisy_net
 
   def forward(self, state_embeddings, tau_embeddings):
     assert state_embeddings.shape[0] == tau_embeddings.shape[0]
@@ -156,16 +156,16 @@ class QuantileNetwork(nn.Module):
     N = tau_embeddings.shape[1]
 
     # Reshape into (batch_size, 1, embedding_dim).
-    state_embeddings = state_embeddings.view(batch_size, 1, self._embedding_dim)
+    state_embeddings = state_embeddings.view(batch_size, 1, self.embedding_dim)
 
     # Calculate embeddings of states and taus.
     embeddings = (state_embeddings * tau_embeddings).view(
-        batch_size * N, self._embedding_dim)
+        batch_size * N, self.embedding_dim)
 
     # Calculate quantile values.
-    quantiles = self._net(embeddings)
+    quantiles = self.net(embeddings)
 
-    return quantiles.view(batch_size, N, self._num_actions)
+    return quantiles.view(batch_size, N, self.num_actions)
 
 
 class NoisyLinear(nn.Module):
@@ -174,42 +174,42 @@ class NoisyLinear(nn.Module):
     super(NoisyLinear, self).__init__()
 
     # Learnable parameters.
-    self._mu_W = nn.Parameter(torch.FloatTensor(out_features, in_features))
-    self._sigma_W = nn.Parameter(torch.FloatTensor(out_features, in_features))
-    self._mu_bias = nn.Parameter(torch.FloatTensor(out_features))
-    self._sigma_bias = nn.Parameter(torch.FloatTensor(out_features))
+    self.mu_W = nn.Parameter(torch.FloatTensor(out_features, in_features))
+    self.sigma_W = nn.Parameter(torch.FloatTensor(out_features, in_features))
+    self.mu_bias = nn.Parameter(torch.FloatTensor(out_features))
+    self.sigma_bias = nn.Parameter(torch.FloatTensor(out_features))
 
     # Factorized noise parameters.
     self.register_buffer('eps_p', torch.FloatTensor(in_features))
     self.register_buffer('eps_q', torch.FloatTensor(out_features))
 
-    self._in_features = in_features
-    self._out_features = out_features
-    self._sigma = sigma
+    self.in_features = in_features
+    self.out_features = out_features
+    self.sigma = sigma
 
     self.reset()
     self.sample()
 
   def reset(self):
-    bound = 1 / np.sqrt(self._in_features)
-    self._mu_W.data.uniform_(-bound, bound)
-    self._mu_bias.data.uniform_(-bound, bound)
-    self._sigma_W.data.fill_(self._sigma / np.sqrt(self._in_features))
-    self._sigma_bias.data.fill_(self._sigma / np.sqrt(self._out_features))
+    bound = 1 / np.sqrt(self.in_features)
+    self.mu_W.data.uniform_(-bound, bound)
+    self.mu_bias.data.uniform_(-bound, bound)
+    self.sigma_W.data.fill_(self.sigma / np.sqrt(self.in_features))
+    self.sigma_bias.data.fill_(self.sigma / np.sqrt(self.out_features))
 
   def f(self, x):
     return x.normal_().sign().mul(x.abs().sqrt())
 
   def sample(self):
-    self._eps_p.copy_(self.f(self._eps_p))
-    self._eps_q.copy_(self.f(self._eps_q))
+    self.eps_p.copy_(self.f(self.eps_p))
+    self.eps_q.copy_(self.f(self.eps_q))
 
   def forward(self, x):
-    if self._training:
-      weight = self._mu_W + self._sigma_W * self._eps_q.ger(self._eps_p)
-      bias = self._mu_bias + self._sigma_bias * self._eps_q.clone()
+    if self.training:
+      weight = self.mu_W + self.sigma_W * self.eps_q.ger(self.eps_p)
+      bias = self.mu_bias + self.sigma_bias * self.eps_q.clone()
     else:
-      weight = self._mu_W
-      bias = self._mu_bias
+      weight = self.mu_W
+      bias = self.mu_bias
 
     return F.linear(x, weight, bias)

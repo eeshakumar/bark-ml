@@ -68,14 +68,14 @@ def evaluate_quantile_at_action(s_quantiles, actions):
 class RunningMeanStats:
 
   def __init__(self, n=10):
-    self._n = n
-    self._stats = deque(maxlen=n)
+    self.n = n
+    self.stats = deque(maxlen=n)
 
   def append(self, x):
-    self._stats.append(x)
+    self.stats.append(x)
 
   def get(self):
-    return np.mean(self._stats)
+    return np.mean(self.stats)
 
 
 class LinearAnneaer:
@@ -83,17 +83,17 @@ class LinearAnneaer:
   def __init__(self, start_value, end_value, num_steps):
     assert num_steps > 0 and isinstance(num_steps, int)
 
-    self._steps = 0
-    self._start_value = start_value
-    self._end_value = end_value
-    self._num_steps = num_steps
+    self.steps = 0
+    self.start_value = start_value
+    self.end_value = end_value
+    self.num_steps = num_steps
 
-    self._a = (self._end_value - self._start_value) / self._num_steps
-    self._b = self._start_value
+    self.a = (self.end_value - self.start_value) / self.num_steps
+    self.b = self.start_value
 
   def step(self):
-    self._steps = min(self._num_steps, self._steps + 1)
+    self.steps = min(self.num_steps, self.steps + 1)
 
   def get(self):
-    assert 0 < self._steps <= self._num_steps
-    return self._a * self._steps + self._b
+    assert 0 < self.steps <= self.num_steps
+    return self.a * self.steps + self.b
