@@ -21,44 +21,51 @@ from .base_agent import BaseAgent
 
 
 class FQFAgent(BaseAgent):
+  def __init__(self, *args, **kwargs):
+    super(FQFAgent, self).__init__(*args, **kwargs)
 
-  def __init__(self, env, test_env, params):
-    super(FQFAgent, self).__init__(env, test_env, params)
-
+  def reset_params(self, params):
+    super(FQFAgent, self).reset_params(params)
     # NOTE: The author said the training of Fraction Proposal Net is
     # unstable and value distribution degenerates into a deterministic
     # one rarely (e.g. 1 out of 20 seeds). So you can use entropy of value
     # distribution as a regularizer to stabilize (but possibly slow down)
     # training.
-    self._ent_coef = self._params["ML"]["FQFAgent"]["Ent_coefs", "", 0]
-    self._N = self._params["ML"]["FQFAgent"]["N", "", 32]
-    self._num_cosines = self._params["ML"]["FQFAgent"]["NumCosines", "", 64]
-    self._kappa = self._params["ML"]["FQFAgent"]["Kappa", "", 1.0]
-
-    # Online network.
-    self._online_net = FQF(num_channels=env.observation_space.shape[0],
-                           num_actions=self._num_actions,
-                           N=self._N,
-                           num_cosines=self._num_cosines,
-                           noisy_net=self._noisy_net,
-                           params=self._params).to(self._device)
+    self.ent_coef = self._params["ML"]["FQFAgent"]["Ent_coefs", "", 0]
+    self.N = self._params["ML"]["FQFAgent"]["N", "", 32]
+    self.num_cosines = self._params["ML"]["FQFAgent"]["NumCosines", "", 64]
+    self.kappa = self._params["ML"]["FQFAgent"]["Kappa", "", 1.0]
+    self.fractional_learning_rate = self._params["ML"]["FQFAgent"]["FractionalLearningRate", "",
+                                          2.5e-9]
+  
+  def init_always(self):
+    super(FQFAgent, self).init_always()
+      # Online network.
+    self.online_net = FQF(num_channels=self.observer.observation_space.shape[0],
+                          num_actions=self.num_actions,
+                          N=self.N,
+                          num_cosines=self.num_cosines,
+                          dueling_net=self.dueling_net,
+                          noisy_net=self.noisy_net,
+                          params=self._params).to(self.device)
     # Target network.
-    self._target_net = FQF(num_channels=env.observation_space.shape[0],
-                           num_actions=self._num_actions,
-                           N=self._N,
-                           num_cosines=self._num_cosines,
-                           noisy_net=self._noisy_net,
-                           target=True,
-                           params=self._params).to(self._device)
+    self.target_net = FQF(num_channels=self.observer.observation_space.shape[0],
+                          num_actions=self.num_actions,
+                          N=self.N,
+                          num_cosines=self.num_cosines,
+                          dueling_net=self.dueling_net,
+                          noisy_net=self.noisy_net,
+                          target=True,
+                          params=self._params).to(self.device)
 
     # Copy parameters of the learning network to the target network.
     self.update_target()
     # Disable calculations of gradients of the target network.
     disable_gradients(self._target_net)
 
-    self._fraction_optim = RMSprop(
-        self._online_net.fraction_net.parameters(),
-        lr=self._params["ML"]["FQFAgent"]["FractionalLearningRate", "", 2.5e-9],
+    self.fraction_optim = RMSprop(
+        self.online_net.fraction_net.parameters(),
+        lr=self.fractional_learning_rate,
         alpha=0.95,
         eps=0.00001)
 
@@ -69,6 +76,11 @@ class FQFAgent(BaseAgent):
         lr=self._params["ML"]["FQFAgent"]["QuantileLearningRate", "", 5e-5],
         eps=1e-2 / self._batch_size)
 
+  def clean_pickables(self, pickables):
+    super(FQFAgent, self).clean_pickables(pickables)
+    del pickables["fraction_optim"]
+    del pickables["quantile_optim"]
+
   def update_target(self):
     self._target_net.dqn_net.load_state_dict(
         self._online_net.dqn_net.state_dict())
@@ -78,7 +90,7 @@ class FQFAgent(BaseAgent):
         self._online_net.cosine_net.state_dict())
 
   def learn(self):
-    self._learning_steps += 1
+    self.learning_steps += 1
     self._online_net.sample_noise()
     self._target_net.sample_noise()
 
@@ -135,7 +147,7 @@ class FQFAgent(BaseAgent):
     if self._use_per:
       self._memory.update_priority(errors)
 
-    if self._learning_steps % self._summary_log_interval == 0:
+    if self.learning_steps % self._summary_log_interval == 0:
       self._writer.add_scalar('loss/fraction_loss',
                               fraction_loss.detach().item(), 4 * self._steps)
       self._writer.add_scalar('loss/quantile_loss',

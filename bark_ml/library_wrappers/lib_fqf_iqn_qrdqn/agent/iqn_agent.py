@@ -22,7 +22,7 @@ from .base_agent import BaseAgent
 class IQNAgent(BaseAgent):
 
   def __init__(self, env, test_env, params):
-    super(IQNAgent, self).__init__(env, test_env, params)
+    super(IQNAgent, self).__init__(env, params)
 
     self._N = self._params["ML"]["IQNAgent"]["N", "", 64]
     self._N_dash = self._params["ML"]["IQNAgent"]["N_dash", "", 64]

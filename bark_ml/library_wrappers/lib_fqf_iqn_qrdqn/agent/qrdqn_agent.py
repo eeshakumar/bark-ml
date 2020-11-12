@@ -22,7 +22,7 @@ from .base_agent import BaseAgent
 class QRDQNAgent(BaseAgent):
 
   def __init__(self, env, test_env, params):
-    super(QRDQNAgent, self).__init__(env, test_env, params)
+    super(QRDQNAgent, self).__init__(env, params)
 
     self._N = self._params["ML"]["QRDQNAgent"]["N", "", 200]
     self._kappa = self._params["ML"]["QRDQNAgent"]["Kappa", "", 1.0]
