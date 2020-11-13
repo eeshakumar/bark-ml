@@ -423,7 +423,7 @@ class BaseAgent(BehaviorModel):
 
     if self.steps % self.eval_interval == 0:
       self.evaluate()
-      self.save(os.path.join(self.model_dir, 'final'))
+      self.save(checkpoint_type='last')
       self.online_net.train()
 
   def evaluate(self):
@@ -436,7 +436,7 @@ class BaseAgent(BehaviorModel):
     if not self.best_eval_results or \
         self._training_benchmark.is_better(eval_results, self.best_eval_results):
       self.best_eval_results = eval_results
-      self.save(os.path.join(self.model_dir, 'best'))
+      self.save(checkpoint_type='best')
 
     # We log evaluation results along with training frames = 4 * steps.
     for eval_result_name, eval_result in eval_results.items():
