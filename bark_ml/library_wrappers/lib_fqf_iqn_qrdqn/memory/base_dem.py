@@ -40,7 +40,7 @@ class LazyDemMemory(LazyMemory):
         self.demo_capacity = int(demo_ratio*capacity)
         self.agent_capacity = capacity - self.demo_capacity
         self._dn = 0
-        self._an = self.an_start = self.demo_capacity
+        self._an = self.demo_capacity
 
     def reset(self, is_demo=True):
         super().reset()
@@ -77,7 +77,7 @@ class LazyDemMemory(LazyMemory):
             self['done'][self._an] = done
             self['is_demo'][self._an] = is_demo
             # print("AN", self._an)
-            if self._an - self.an_start >= self.agent_capacity:
+            if self._an - self.demo_capacity >= (self.agent_capacity - 1):
                 self._an = self.demo_capacity
             else:
                 self._an = (self._an + 1)

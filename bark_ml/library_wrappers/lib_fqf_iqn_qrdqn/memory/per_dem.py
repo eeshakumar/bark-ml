@@ -47,9 +47,7 @@ class LazyPrioritizedDemMultiStepMemory(LazyDemMultiStepMemory):
     def _pa(self, p, is_demos):
         # take epsilon_demo when is_demo is 1, else take epsilon_alpha
         eps = self.eps + self.epsilon_demo * is_demos + self.epsilon_alpha * (1.0 - is_demos)
-        # print("Epsilon for priority and p", eps, p)
         clipped_p =  np.clip((p + eps) ** self.alpha, self.min_pa, self.max_pa)
-        # print("Clipped priority", clipped_p)
         return clipped_p
 
     def append(self, state, action, reward, next_state, done, is_demo, p=None):
@@ -87,11 +85,9 @@ class LazyPrioritizedDemMultiStepMemory(LazyDemMultiStepMemory):
 
     def _sample_idxes(self, batch_size):
         total_pa = self.it_sum.sum(0, self._n)
-        # print("TOtal pa", total_pa)
+        # print("Total pa", total_pa)
         rands = np.random.rand(batch_size) * total_pa
-        # print(rands)
         # print("Rands", rands, [self.it_sum.find_prefixsum_idx(r) for r in rands])
-        # print([self.it_sum.find_prefixsum_idx(r) for r in rands])
         indices = [self.it_sum.find_prefixsum_idx(r) for r in rands]
         self.beta = min(1., self.beta + self.beta_diff)
         return indices
@@ -100,6 +96,8 @@ class LazyPrioritizedDemMultiStepMemory(LazyDemMultiStepMemory):
         assert self._cached is None, 'Update priorities before sampling.'
 
         self._cached = self._sample_idxes(batch_size)
+        # cached stores index of retrieved batch elements
+        # print("Retrieving indices", self._cached)
         batch = self._sample(self._cached, batch_size)
         weights = self._calc_weights(self._cached)
         return batch, weights
@@ -114,7 +112,7 @@ class LazyPrioritizedDemMultiStepMemory(LazyDemMultiStepMemory):
 
     def update_priority(self, errors, is_demos):
         #TODO: change priority equation.
-        assert self._cached is not None
+        assert self._cached is not None, "No Elements were sampled"
         # print("Is demos passed", is_demos)
         is_demos_expanded = torch.zeros(errors.shape)
         for i in range(is_demos.shape[0]):
@@ -125,6 +123,7 @@ class LazyPrioritizedDemMultiStepMemory(LazyDemMultiStepMemory):
         # print("Is demos detatched", is_demos)
         assert ps.shape == is_demos.shape
         pas = self._pa(ps, is_demos)
+        # print("Updated Priorities", pas)
         self.per_prio_max = max(pas.max(), self.per_prio_max)
 
         for index, pa in zip(self._cached, pas):
@@ -135,3 +134,7 @@ class LazyPrioritizedDemMultiStepMemory(LazyDemMultiStepMemory):
 
         # print("Updated Priorities", pas)
         self._cached = None
+    
+    @property
+    def sampled(self):
+        return self._cached
