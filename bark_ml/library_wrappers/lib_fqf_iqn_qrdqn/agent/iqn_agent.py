@@ -8,7 +8,7 @@
 
 # The code is adapted from opensource implementation - https://github.com/ku2482/fqf-iqn-qrdqn.pytorch
 # MIT License -Copyright (c) 2020 Toshiki Watanabe
-
+import logging
 import torch
 from torch.optim import Adam
 
@@ -82,13 +82,17 @@ class IQNAgent(BaseAgent):
        self.memory.sample(self.batch_size)
       weights = None
 
+    # average rewards from batch
+    mean_batch_reward = torch.mean(rewards)
+
     # Calculate features of states.
     state_embeddings = self.online_net.calculate_state_embeddings(states)
 
     quantile_loss, mean_q, errors = self.calculate_loss(
         state_embeddings, actions, rewards, next_states, dones, weights)
 
-    update_params(self.optim,
+
+    gradient = update_params(self.optim,
                   quantile_loss,
                   networks=[self.online_net],
                   retain_graph=False,
@@ -101,6 +105,9 @@ class IQNAgent(BaseAgent):
       self.writer.add_scalar('loss/quantile_loss',
                               quantile_loss.detach().item(), 4 * self.steps)
       self.writer.add_scalar('stats/mean_Q', mean_q, 4 * self.steps)
+      self.writer.add_scalar('stats/mean_reward', mean_batch_reward, 4 * self.steps)
+      if gradient is not None:
+        self.writer.add_scalar('loss/grad', gradient, 4 * self.steps)
 
   def calculate_loss(self, state_embeddings, actions, rewards, next_states,
                      dones, weights):

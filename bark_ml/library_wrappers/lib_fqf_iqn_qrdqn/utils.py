@@ -11,6 +11,7 @@ def update_params(optim, loss, networks, retain_graph=False, grad_cliping=None):
     for net in networks:
       torch.nn.utils.clip_grad_norm_(net.parameters(), grad_cliping)
   optim.step()
+  return loss.retain_grad()
 
 
 def disable_gradients(network):

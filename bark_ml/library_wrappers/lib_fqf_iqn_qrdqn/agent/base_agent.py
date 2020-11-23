@@ -46,15 +46,16 @@ class TrainingBenchmark:
     self.max_episode_steps = None
     self.agent = None
 
-  def reset(self, training_env, num_episodes, max_episode_steps, agent):
+  def reset(self, training_env, num_eval_steps, max_episode_steps, agent):
     self.training_env = training_env
-    self.num_episodes = num_episodes
+    self.num_eval_steps = num_eval_steps
     self.max_episode_steps = max_episode_steps
     self.agent = agent
 
   def run(self):
     # returns dict with evaluated metrics
     num_episodes = 0
+    num_steps = 0
     total_return = 0.0
 
     while True:
@@ -69,6 +70,7 @@ class TrainingBenchmark:
           action = self.agent.Act(state)
 
         next_state, reward, done, _ = self.training_env.step(action)
+        num_steps += 1
         episode_steps += 1
         episode_return += reward
         state = next_state
@@ -76,7 +78,7 @@ class TrainingBenchmark:
       num_episodes += 1
       total_return += episode_return
 
-      if num_episodes > self.num_episodes:
+      if num_steps > self.num_eval_steps:
         break
 
     mean_return = total_return / num_episodes
@@ -97,7 +99,7 @@ class BaseAgent(BehaviorModel):
     if not checkpoint_load and params:
       if not env:
         raise ValueError("Environment must be passed for initialization")
-      self.reset_params(self._params["ML"]["BaseAgent"])
+      self.reset_params(self._params)
       self.reset_action_observer(env)
       self.init_always()
       self.reset_training_variables()
@@ -123,7 +125,7 @@ class BaseAgent(BehaviorModel):
     #       as this enables the agents to be plug and played in BARK.
     self._set_action_externally = False
     self._training_benchmark.reset(self._env, \
-        self.num_eval_episodes, self.max_episode_steps, self)
+        self.num_eval_steps, self.max_episode_steps, self)
 
   def reset_action_observer(self, env):
     self._observer = self._env._observer
@@ -175,39 +177,39 @@ class BaseAgent(BehaviorModel):
     self.best_eval_results = None
 
   def reset_params(self, params):
-    self.num_steps = params["NumSteps", "", 5000000]
-    self.batch_size = params["BatchSize", "", 32]
+    self.num_steps = params["ML"]["BaseAgent"]["NumSteps", "", 5000000]
+    self.batch_size = params["ML"]["BaseAgent"]["BatchSize", "", 32]
 
-    self.double_q_learning = params["Double_q_learning", "", False]
-    self.dueling_net = params["DuelingNet", "", False]
-    self.noisy_net = params["NoisyNet", "", False]
-    self.use_per = params["Use_per", "", False]
+    self.double_q_learning = params["ML"]["BaseAgent"]["Double_q_learning", "", False]
+    self.dueling_net = params["ML"]["BaseAgent"]["DuelingNet", "", False]
+    self.noisy_net = params["ML"]["BaseAgent"]["NoisyNet", "", False]
+    self.use_per = params["ML"]["BaseAgent"]["Use_per", "", False]
 
-    self.reward_log_interval = params["RewardLogInterval", "", 5]
-    self.summary_log_interval = params["SummaryLogInterval", "", 100]
-    self.eval_interval = params["EvalInterval", "",
+    self.reward_log_interval = params["ML"]["BaseAgent"]["RewardLogInterval", "", 5]
+    self.summary_log_interval = params["ML"]["BaseAgent"]["SummaryLogInterval", "", 100]
+    self.eval_interval = params["ML"]["BaseAgent"]["EvalInterval", "",
                                                          25000]
-    self.num_eval_episodes = params["NumEvalEpisodes", "",
+    self.num_eval_steps = params["ML"]["BaseAgent"]["NumEvalSteps", "",
                                                           12500]
-    self.gamma_n = params["Gamma", "", 0.99] ** \
-        params["Multi_step", "", 1]
+    self.gamma_n = params["ML"]["BaseAgent"]["Gamma", "", 0.99] ** \
+        params["ML"]["BaseAgent"]["Multi_step", "", 1]
 
-    self.start_steps = params["StartSteps", "", 5000]
+    self.start_steps = params["ML"]["BaseAgent"]["StartSteps", "", 5000]
     self.epsilon_train = LinearAnneaer(
-        1.0, params["EpsilonTrain", "", 0.01],
-        params["EpsilonDecaySteps", "", 25000])
-    self.epsilon_eval = params["EpsilonEval", "",
+        1.0, params["ML"]["BaseAgent"]["EpsilonTrain", "", 0.01],
+        params["ML"]["BaseAgent"]["EpsilonDecaySteps", "", 25000])
+    self.epsilon_eval = params["ML"]["BaseAgent"]["EpsilonEval", "",
                                                         0.001]
-    self.update_interval = params["Update_interval", "", 4]
-    self.target_update_interval = params["TargetUpdateInterval", "", 5000]
-    self.max_episode_steps = params["MaxEpisodeSteps",  "", 10000]
-    self.grad_cliping = params["GradCliping", "", 5.0]
+    self.update_interval = params["ML"]["BaseAgent"]["Update_interval", "", 4]
+    self.target_update_interval = params["ML"]["BaseAgent"]["TargetUpdateInterval", "", 5000]
+    self.max_episode_steps = params["ML"]["BaseAgent"]["MaxEpisodeSteps",  "", 10000]
+    self.grad_cliping = params["ML"]["BaseAgent"]["GradCliping", "", 5.0]
 
-    self.memory_size = params["MemorySize", "", 10**6]
-    self.gamma = params["Gamma", "", 0.99]
-    self.multi_step = params["Multi_step", "", 1]
+    self.memory_size = params["ML"]["BaseAgent"]["MemorySize", "", 10**6]
+    self.gamma = params["ML"]["BaseAgent"]["Gamma", "", 0.99]
+    self.multi_step = params["ML"]["BaseAgent"]["Multi_step", "", 1]
 
-    self.use_cuda = params["Cuda", "", False] 
+    self.use_cuda = params["ML"]["BaseAgent"]["Cuda", "", False] 
 
   @property
   def observer(self):
