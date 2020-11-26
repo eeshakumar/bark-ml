@@ -146,19 +146,19 @@ class LazyMultiStepMemory(LazyMemory):
     self.gamma = gamma
     self.multi_step = int(multi_step)
     if self.multi_step != 1:
-      self._buff = MultiStepBuff(maxlen=self.multi_step)
+      self.buff = MultiStepBuff(maxlen=self.multi_step)
 
   def append(self, state, action, reward, next_state, done):
     if self.multi_step != 1:
-      self._buff.append(state, action, reward)
+      self.buff.append(state, action, reward)
 
-      if self._buff.is_full():
-        state, action, reward = self._buff.get(self.gamma)
+      if self.buff.is_full():
+        state, action, reward = self.buff.get(self.gamma)
         self._append(state, action, reward, next_state, done)
 
       if done:
-        while not self._buff.is_empty():
-          state, action, reward = self._buff.get(self.gamma)
+        while not self.buff.is_empty():
+          state, action, reward = self.buff.get(self.gamma)
           self._append(state, action, reward, next_state, done)
     else:
       self._append(state, action, reward, next_state, done)

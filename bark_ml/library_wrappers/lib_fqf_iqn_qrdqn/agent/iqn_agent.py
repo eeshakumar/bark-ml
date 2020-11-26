@@ -91,7 +91,6 @@ class IQNAgent(BaseAgent):
     quantile_loss, mean_q, errors = self.calculate_loss(
         state_embeddings, actions, rewards, next_states, dones, weights)
 
-
     gradient = update_params(self.optim,
                   quantile_loss,
                   networks=[self.online_net],
@@ -105,9 +104,10 @@ class IQNAgent(BaseAgent):
       self.writer.add_scalar('loss/quantile_loss',
                               quantile_loss.detach().item(), 4 * self.steps)
       self.writer.add_scalar('stats/mean_Q', mean_q, 4 * self.steps)
-      self.writer.add_scalar('stats/mean_reward', mean_batch_reward, 4 * self.steps)
+      self.writer.add_scalar('stats/mean_batch_reward', mean_batch_reward, 4 * self.steps)
       if gradient is not None:
-        self.writer.add_scalar('loss/grad', gradient, 4 * self.steps)
+        print("Registering grad")
+        self.writer.add_scalar('loss/grad', gradient.detach().item(), 4 * self.steps)
 
   def calculate_loss(self, state_embeddings, actions, rewards, next_states,
                      dones, weights):
