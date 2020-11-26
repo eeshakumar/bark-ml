@@ -15,7 +15,7 @@ from torch.optim import Adam
 from bark_ml.library_wrappers.lib_fqf_iqn_qrdqn.model import IQN
 from bark_ml.library_wrappers.lib_fqf_iqn_qrdqn.utils \
  import disable_gradients, update_params, \
- calculate_quantile_huber_loss, evaluate_quantile_at_action
+ calculate_quantile_huber_loss, calculate_supervised_margin_classification_loss, evaluate_quantile_at_action
 from .base_agent import BaseAgent
 
 
@@ -169,6 +169,12 @@ class IQNAgent(BaseAgent):
 
     quantile_huber_loss = calculate_quantile_huber_loss(td_errors, taus,
                                                         weights, self.kappa)
+
+    # TODO: Get from demonstrator
+    demonstrator_q = torch.ones(next_q.shape)
+    demonstrator_action = 5
+    supervised_margin_loss = calculate_supervised_margin_classification_loss(
+      next_q, demonstrator_q, demonstrator_action, next_actions, total_actions=self.action_space._n)
 
     return quantile_huber_loss, next_q.detach().mean().item(), \
         td_errors.detach().abs()

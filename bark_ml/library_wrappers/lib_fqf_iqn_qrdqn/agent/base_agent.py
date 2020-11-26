@@ -421,7 +421,7 @@ class BaseAgent(BehaviorModel):
   def train_step_interval(self):
     self.epsilon_train.step()
     # print("Train Step Interval", self.steps)
-    self.memory.per_beta.step()
+    # self.memory.per_beta.step()
     # print("Stepped Per Beta", self.memory.per_beta.get())
 
     if self.steps % self.target_update_interval == 0:

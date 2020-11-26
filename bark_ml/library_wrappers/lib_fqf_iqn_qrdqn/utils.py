@@ -20,9 +20,37 @@ def disable_gradients(network):
     param.requires_grad = False
 
 
+def get_action_margins_loss(total_actions, next_actions, demonstrated_action, margin=0.5):
+  print(next_actions, next_actions.shape)
+  margins = (torch.ones(total_actions, total_actions) - torch.eye(total_actions)) * margin
+  print(margins.shape)
+  print(margins)
+  print("SQUEEZE", next_actions.squeeze().cpu())
+  predicted_actions_margins = margins[next_actions.squeeze().cpu()]
+  print(predicted_actions_margins.shape)
+  print(predicted_actions_margins)
+  return predicted_actions_margins
+
+
 def calculate_huber_loss(td_errors, kappa=1.0):
   return torch.where(td_errors.abs() <= kappa, 0.5 * td_errors.pow(2),
                      kappa * (td_errors.abs() - 0.5 * kappa))
+
+def calculate_supervised_margin_classification_loss(q_demonstrator, q_agent, demonstrated_action, next_actions, total_actions, margin=1.0):
+  """supervised margin loss to force Q value of all non expert actions to be lower"""
+  print("SM LOss", q_agent.shape)
+  assert q_demonstrator.shape == q_agent.shape
+  assert total_actions == 8
+  action_margins_loss = get_action_margins_loss(total_actions, next_actions, demonstrated_action)
+  q1, p1 =  torch.max(
+    q_agent + action_margins_loss, dim=0
+  )
+  q2, p2 = torch.max(
+    q_demonstrator, dim=0
+  )
+  print(q1.cpu() + q2.cpu())
+  print("Q1", q1.shape)
+
 
 
 def calculate_quantile_huber_loss(td_errors, taus, weights=None, kappa=1.0):
