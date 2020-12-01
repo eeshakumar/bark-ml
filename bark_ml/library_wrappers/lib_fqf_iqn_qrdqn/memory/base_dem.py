@@ -98,26 +98,18 @@ class LazyDemMemory(LazyMemory):
         self.truncate()
 
     def _sample(self, indices, batch_size):
-        # print("Sampling Indices", indices)
-        bias = -self._p if self._n == self.capacity else 0
-        # print('Bias', bias)
-        states = np.empty((batch_size, *self.state_shape), dtype=np.uint8)
-        next_states = np.empty((batch_size, *self.state_shape), dtype=np.uint8)
+        # bias = -self._p if self._n == self.capacity else 0
+        states = np.empty((batch_size, *self.state_shape), dtype=np.float32)
+        next_states = np.empty((batch_size, *self.state_shape), dtype=np.float32)
 
-        # print("Sample Indices", indices)
         for i, index in enumerate(indices):
-            # print("index", index)
             # bias is annealed in importance sampling, so there is no use for it here
-            _index = np.mod(index + bias, self.capacity)
-            # print("Biased Sampling indices", _index)
-            # print("_index", _index)
+            # _index = np.mod(index + bias, self.capacity)
             states[i, ...] = self['state'][index]
             next_states[i, ...] = self['next_state'][index]
 
-        # print("BEF DIVISION", states, next_states)
-        states = torch.ByteTensor(states).to(self.device).float() / 255.
-        next_states = torch.ByteTensor(next_states).to(self.device).float() / 255.
-        # print("After DIVISION", states, next_states)
+        states = torch.from_numpy(states).to(self.device)
+        next_states = torch.from_numpy(next_states).to(self.device)
         actions = torch.LongTensor(self['action'][indices]).to(self.device)
         rewards = torch.FloatTensor(self['reward'][indices]).to(self.device)
         dones = torch.FloatTensor(self['done'][indices]).to(self.device)
@@ -139,7 +131,6 @@ class LazyDemMultiStepMemory(LazyDemMemory):
     def append(self, state, action, reward, next_state, done, is_demo):
         # print("Append to memory reward/is_demo", reward, is_demo)
         if self.multi_step != 1:
-            print("Buff length", len(self.buff))
             self.buff.append(state, action, reward, is_demo)
             if self.buff.is_full():
                 #TODO: priority change

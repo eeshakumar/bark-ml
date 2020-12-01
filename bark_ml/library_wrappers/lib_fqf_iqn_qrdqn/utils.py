@@ -20,37 +20,50 @@ def disable_gradients(network):
     param.requires_grad = False
 
 
-def get_action_margins_loss(total_actions, next_actions, demonstrated_action, margin=0.5):
-  print(next_actions, next_actions.shape)
+def get_onehot(input_list, columns):
+  if isinstance(input_list, torch.Tensor):
+    input_list = input_list.squeeze().type(torch.int8).cpu().detach().numpy()
+  rows = input_list.shape[0]
+  input_onehot = np.zeros((rows, columns))
+  input_onehot[np.arange(rows), input_list] = 1.
+  return input_onehot
+
+
+# def get_action_margins_loss(actions, predicted_actions, total_actions, is_demos, margin=0.5):
+#   assert actions.shape == predicted_actions.shape
+#   sampled_demonstrator_actions = actions * is_demos
+#   sampled_agent_actions = actions * (1 - is_demos)
+#   one_hot_demonstrations = get_onehot(sampled_demonstrator_actions, total_actions)
+#   one_hot_agent_actions = get_onehot(sampled_agent_actions, total_actions)
+#   action_margin_loss = np.zeros((actions.shape[0], total_actions))
+#   action_margin_loss[one_hot_demonstrations != one_hot_agent_actions] = margin
+#   print(action_margin_loss)
+#   return torch.from_numpy(action_margin_loss).float().to(sampled_agent_actions.device)
+
+def get_margin_loss(actions, total_actions, is_demos, margin, device):
   margins = (torch.ones(total_actions, total_actions) - torch.eye(total_actions)) * margin
-  print(margins.shape)
-  print(margins)
-  print("SQUEEZE", next_actions.squeeze().cpu())
-  predicted_actions_margins = margins[next_actions.squeeze().cpu()]
-  print(predicted_actions_margins.shape)
-  print(predicted_actions_margins)
-  return predicted_actions_margins
+  sampled_batch_margins = margins[actions.long()] 
+  return sampled_batch_margins.squeeze().to(device)
 
 
 def calculate_huber_loss(td_errors, kappa=1.0):
   return torch.where(td_errors.abs() <= kappa, 0.5 * td_errors.pow(2),
                      kappa * (td_errors.abs() - 0.5 * kappa))
 
-def calculate_supervised_margin_classification_loss(q_demonstrator, q_agent, demonstrated_action, next_actions, total_actions, margin=1.0):
+def calculate_supervised_margin_classification_loss(current_q, actions, predicted_actions, total_actions, is_demos, device, 
+                                                    margin=0.5):
   """supervised margin loss to force Q value of all non expert actions to be lower"""
-  print("SM LOss", q_agent.shape)
-  assert q_demonstrator.shape == q_agent.shape
-  assert total_actions == 8
-  action_margins_loss = get_action_margins_loss(total_actions, next_actions, demonstrated_action)
-  q1, p1 =  torch.max(
-    q_agent + action_margins_loss, dim=0
-  )
-  q2, p2 = torch.max(
-    q_demonstrator, dim=0
-  )
-  print(q1.cpu() + q2.cpu())
-  print("Q1", q1.shape)
-
+  sampled_batch_margin_loss = get_margin_loss(actions, total_actions, is_demos, margin, device)
+  assert sampled_batch_margin_loss.shape == current_q.shape
+  q1 = torch.max(current_q + sampled_batch_margin_loss, dim=1)[0]
+  q2 = torch.diag(current_q[torch.arange(current_q.size(0)), actions.long()])
+  q1 = q1.reshape(actions.shape)
+  q2 = q2.reshape(actions.shape)
+  assert q1.shape == q2.shape
+  loss = is_demos * (q1 - q2)
+  # net loss is mean of batch loss
+  assert loss.shape == actions.shape
+  return loss.mean()
 
 
 def calculate_quantile_huber_loss(td_errors, taus, weights=None, kappa=1.0):

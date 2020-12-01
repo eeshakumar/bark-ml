@@ -75,8 +75,12 @@ class IQNAgent(BaseAgent):
     self.target_net.sample_noise()
 
     if self.use_per:
-      (states, actions, rewards, next_states, dones), weights = \
-       self.memory.sample(self.batch_size)
+      if self.demonstrator is not None:
+        (states, actions, rewards, next_states, dones, is_demos), weights = \
+        self.memory.sample(self.batch_size)
+      else:
+        (states, actions, rewards, next_states, dones), weights = \
+        self.memory.sample(self.batch_size)
     else:
       states, actions, rewards, next_states, dones = \
        self.memory.sample(self.batch_size)
@@ -88,8 +92,12 @@ class IQNAgent(BaseAgent):
     # Calculate features of states.
     state_embeddings = self.online_net.calculate_state_embeddings(states)
 
-    quantile_loss, mean_q, errors = self.calculate_loss(
-        state_embeddings, actions, rewards, next_states, dones, weights)
+    if self.demonstrator is not None:
+      quantile_loss, mean_q, errors = self.calculate_loss(
+          state_embeddings, actions, rewards, next_states, dones, weights, states, is_demos)
+    else:
+      quantile_loss, mean_q, errors = self.calculate_loss(
+          state_embeddings, actions, rewards, next_states, dones, weights, states)
 
     gradient = update_params(self.optim,
                   quantile_loss,
@@ -98,7 +106,10 @@ class IQNAgent(BaseAgent):
                   grad_cliping=self.grad_cliping)
 
     if self.use_per:
-      self.memory.update_priority(errors)
+      if self.demonstrator is not None:
+        self.memory.update_priority(errors, is_demos)
+      else:
+        self.memory.update_priority(errors)
 
     if 4 * self.steps % self.summary_log_interval == 0:
       self.writer.add_scalar('loss/quantile_loss',
@@ -110,12 +121,16 @@ class IQNAgent(BaseAgent):
         self.writer.add_scalar('loss/grad', gradient.detach().item(), 4 * self.steps)
 
   def calculate_loss(self, state_embeddings, actions, rewards, next_states,
-                     dones, weights):
+                     dones, weights, states, is_demos=None):
     # Sample fractions.
     taus = torch.rand(self.batch_size,
                       self.N,
                       dtype=state_embeddings.dtype,
                       device=state_embeddings.device)
+
+    # get current q values from network
+    self.online_net.sample_noise()
+    current_q = self.online_net.calculate_q(states=states)
 
     # Calculate quantile values of current states and actions at tau_hats.
     current_sa_quantiles = evaluate_quantile_at_action(
@@ -169,12 +184,12 @@ class IQNAgent(BaseAgent):
 
     quantile_huber_loss = calculate_quantile_huber_loss(td_errors, taus,
                                                         weights, self.kappa)
+    total_loss = quantile_huber_loss
 
     # TODO: Get from demonstrator
-    demonstrator_q = torch.ones(next_q.shape)
-    demonstrator_action = 5
     supervised_margin_loss = calculate_supervised_margin_classification_loss(
-      next_q, demonstrator_q, demonstrator_action, next_actions, total_actions=self.action_space._n)
+      current_q, actions, next_actions, is_demos=is_demos, device=self.device, total_actions=self.action_space._n)
 
-    return quantile_huber_loss, next_q.detach().mean().item(), \
+    total_loss += supervised_margin_loss
+    return total_loss, next_q.detach().mean().item(), \
         td_errors.detach().abs()

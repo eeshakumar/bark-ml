@@ -22,7 +22,7 @@ from abc import ABC, abstractmethod
 from bark_ml.library_wrappers.lib_fqf_iqn_qrdqn.utils \
   import RunningMeanStats, LinearAnneaer
 from bark_ml.library_wrappers.lib_fqf_iqn_qrdqn.memory \
-  import LazyMultiStepMemory, LazyPrioritizedMultiStepMemory
+  import LazyMultiStepMemory, LazyPrioritizedDemMultiStepMemory, LazyPrioritizedMultiStepMemory
 from bark_ml.behaviors.discrete_behavior import BehaviorDiscreteMacroActionsML
 
 # BARK imports
@@ -92,12 +92,16 @@ class TrainingBenchmark:
 
 class BaseAgent(BehaviorModel):
   def __init__(self, agent_save_dir=None, env=None, params=None, training_benchmark=None, checkpoint_load=None, 
-              demonstrations = None):
+               demonstrations = None, demonstrator=None):
     BehaviorModel.__init__(self, params)
     self._params = params
     self._env = env
     self._training_benchmark = training_benchmark or TrainingBenchmark()
     self._agent_save_dir = agent_save_dir
+    if demonstrator is not None:
+      self.demonstrator = demonstrator
+    else:
+      self.demonstrator = None
     
     if not checkpoint_load and params:
       if not env:
@@ -156,23 +160,37 @@ class BaseAgent(BehaviorModel):
 
   def reset_training_variables(self):
     # Replay memory which is memory-efficient to store stacked frames.
-    if self.use_per:
-      beta_steps = (self.num_steps - self.start_steps) / \
-             self.update_interval
-      self.memory = LazyPrioritizedMultiStepMemory(
-          self.memory_size,
-          self.observer.observation_space.shape,
-          self.device,
-          self.gamma,
-          self.multi_step,
-          beta_steps=beta_steps)
+    if self.demonstrator is None:
+      if self.use_per:
+        beta_steps = (self.num_steps - self.start_steps) / \
+              self.update_interval
+        self.memory = LazyPrioritizedMultiStepMemory(
+            self.memory_size,
+            self.observer.observation_space.shape,
+            self.device,
+            self.gamma,
+            self.multi_step,
+            beta_steps=beta_steps)
+      else:
+        self.memory = LazyMultiStepMemory(
+            self.memory_size,
+            self.observer.observation_space.shape,
+            self.device,
+            self.gamma,
+            self.multi_step)
     else:
-      self.memory = LazyMultiStepMemory(
-          self.memory_size,
-          self.observer.observation_space.shape,
-          self.device,
-          self.gamma,
-          self.multi_step)
+      # expect a learning from demonstrations setting, reset use_per to true
+      self.use_per = True
+      beta_steps = (self.num_steps - self.start_steps) / \
+        self.update_interval
+      self.memory = LazyPrioritizedDemMultiStepMemory(
+            self.memory_size,
+            self.observer.observation_space.shape,
+            self.device,
+            self.gamma,
+            self.multi_step,
+            beta_steps=beta_steps,
+            demo_ratio=self.demonstrator_buffer_params["demo_capacity_ratio"])
 
     self.steps = 0
     self.learning_steps = 0
@@ -213,6 +231,9 @@ class BaseAgent(BehaviorModel):
     self.multi_step = params["ML"]["BaseAgent"]["Multi_step", "", 1]
 
     self.use_cuda = params["ML"]["BaseAgent"]["Cuda", "", False] 
+
+    if self.demonstrator:
+      self.demonstrator_buffer_params = params.AddChild("ML").AddChild("DemonstratorAgent").AddChild("Buffer")
 
   @property
   def observer(self):
@@ -424,7 +445,7 @@ class BaseAgent(BehaviorModel):
   def train_step_interval(self):
     self.epsilon_train.step()
     # print("Train Step Interval", self.steps)
-    # self.memory.per_beta.step()
+    self.memory.per_beta.step()
     # print("Stepped Per Beta", self.memory.per_beta.get())
 
     if self.steps % self.target_update_interval == 0:

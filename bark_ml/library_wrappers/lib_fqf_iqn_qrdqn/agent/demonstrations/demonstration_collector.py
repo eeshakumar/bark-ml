@@ -50,7 +50,7 @@ class DemonstrationEvaluator(BaseEvaluator):
     return self._nn_observer.Observe(observed_world)
 
   def GetAction(self, observed_world):
-    return observed_world.agents[self._agent_id].behavior_model.GetLastMacroAction()
+    return observed_world.agents[self._agent_id].behavior_model.GetLastAction()
 
   def GetStepEvaluation(self, observed_world, action):
     return self._reward_evaluator.Evaluate(observed_world, action)
