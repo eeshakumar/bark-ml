@@ -25,6 +25,13 @@ from bark_ml.library_wrappers.lib_fqf_iqn_qrdqn.memory \
   import LazyMultiStepMemory, LazyPrioritizedDemMultiStepMemory, LazyPrioritizedMultiStepMemory
 from bark_ml.behaviors.discrete_behavior import BehaviorDiscreteMacroActionsML
 
+# TODO: Imports to remove
+from bark.runtime.commons.parameters import ParameterServer
+from bark_ml.library_wrappers.lib_fqf_iqn_qrdqn.\
+            tests.test_demo_behavior import TestDemoBehavior
+from bark_ml.evaluators.evaluator import StateEvaluator
+
+
 # BARK imports
 from bark.core.models.behavior import BehaviorModel
 
@@ -102,7 +109,7 @@ class BaseAgent(BehaviorModel):
       self.demonstrator = demo_collector
     else:
       self.demonstrator = None
-    
+
     if not checkpoint_load and params:
       if not env:
         raise ValueError("Environment must be passed for initialization")
@@ -236,7 +243,7 @@ class BaseAgent(BehaviorModel):
     self.gamma = params["ML"]["BaseAgent"]["Gamma", "", 0.99]
     self.multi_step = params["ML"]["BaseAgent"]["Multi_step", "", 1]
 
-    self.use_cuda = params["ML"]["BaseAgent"]["Cuda", "", False] 
+    self.use_cuda = params["ML"]["BaseAgent"]["Cuda", "", False]
 
     if self.demonstrator:
       self.demonstrator_buffer_params = params.AddChild("ML").AddChild("DemonstratorAgent").AddChild("Buffer")
@@ -247,7 +254,7 @@ class BaseAgent(BehaviorModel):
   def observer(self):
       return self._observer
 
-  @property 
+  @property
   def env(self):
     return self._env
 
@@ -258,31 +265,88 @@ class BaseAgent(BehaviorModel):
   @property
   def num_actions(self):
     return self.ml_behavior.action_space.n
-  
+
   @property
   def agent_save_dir(self):
     return self._agent_save_dir
 
   def run(self):
     assert self.demonstrator is not None, "Run invoked incorrectly, demonstrator not found!"
+
+    # TODO: Remove this evaluator
+    class TestEvaluator(StateEvaluator):
+      reach_goal = True
+      def __init__(self,
+                  params=ParameterServer()):
+        StateEvaluator.__init__(self, params)
+        self.step = 0
+
+      def _evaluate(self, observed_world, eval_results, action):
+        """Returns information about the current world state
+        """
+        done = False
+        reward = 0.0
+        info = {"goal_r1" : False}
+        if self.step > 2:
+          done = True
+          if self.reach_goal:
+            reward = 0.1
+            info = {"goal_r1" : True}
+        self.step += 1
+        return reward, done, info
+
+      def Reset(self, world):
+        self._step = 0
+        #every second scenario goal is not reached
+        TestEvaluator.reach_goal = not TestEvaluator.reach_goal
+
     demonstrations_save_path = os.path.join(self.agent_save_dir, self.demonstrator_agent_params[
       "save_demo", "", "demonstrations"])
     print("Demonstrations will be saved to", demonstrations_save_path)
-    
+
     def default_training_evaluators():
       default_config = {"success" : "EvaluatorGoalReached", "collision_other" : "EvaluatorCollisionEgoAgent",
           "out_of_drivable" : "EvaluatorDrivableArea", "max_steps": "EvaluatorStepCount"}
       return default_config
 
+    #TODO: Demonstrator behavior must be updated/passed
+    demo_behavior = TestDemoBehavior(self._params)
+    #TODO: Evaluator must not be a TestEvaluator
+    real_evaluator = self._env._evaluator
+    self._env._evaluator = TestEvaluator()
     collection_result = self.demonstrator.CollectDemonstrations(
-      self._env, self._ml_behavior,
+      self._env, demo_behavior,
       self.demonstrator_agent_params["num_demo_episodes", "", 3000],
       demonstrations_save_path,
       use_mp_runner=False,
       runner_init_params={"deepcopy": False})
+    #TODO: evaluator criteria must be updated
     demonstrations = self.demonstrator.ProcessCollectionResult(
-      eval_criteria = {"goal_reached": lambda x: x})
-    print("generated demonstrations", len(demonstrations))
+      eval_criteria = {"goal_r1": lambda x: x})
+    print(type(demonstrations), demonstrations)
+    # TODO: Remove this reassignment
+    self._env._evaluator = real_evaluator
+
+    # Extract and append demonstrations to memory
+    for demo in demonstrations:
+      (state, action, reward, next_state, done, is_demo) = demo
+      self.memory.append(state, action, reward, next_state, done, is_demo)
+
+    assert self.memory._n == len(demonstrations)
+    assert self.memory._dn == len(demonstrations)
+
+    self.online_gradient_update_steps = self.demonstrator_agent_params["online_gradient_update_steps", "", 75000]
+    self.train_on_demonstrations()
+
+    self.save()
+
+  def train_on_demonstrations(self):
+    while True:
+      self.train_step_interval()
+      if self.steps > self.online_gradient_update_steps:
+        print("Initial gradient updates completed. Totoal episodes", self.episodes)
+        break
+    self.set_action_externally = True
 
   def train(self):
     while True:
@@ -392,13 +456,13 @@ class BaseAgent(BehaviorModel):
     self.save_pickable_members(BaseAgent.pickable_directory(self.agent_save_dir))
 
   def load_models(self, checkpoint_dir):
-    try: 
+    try:
       self.online_net.load_state_dict(
         torch.load(os.path.join(checkpoint_dir, 'online_net.pth')))
     except RuntimeError:
       self.online_net.load_state_dict(
         torch.load(os.path.join(checkpoint_dir, 'online_net.pth'), map_location=torch.device('cpu')))
-    try: 
+    try:
       self.target_net.load_state_dict(
         torch.load(os.path.join(checkpoint_dir, 'target_net.pth')))
     except RuntimeError:
@@ -486,7 +550,7 @@ class BaseAgent(BehaviorModel):
     if not self._training_benchmark:
       logging.info("No evaluation performed since no training benchmark available.")
     self.online_net.eval()
-    
+
     eval_results, formatted_result = self._training_benchmark.run()
 
     if not self.best_eval_results or \

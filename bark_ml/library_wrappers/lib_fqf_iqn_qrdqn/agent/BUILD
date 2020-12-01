@@ -35,6 +35,7 @@ py_library(
         ],
     deps = [
         "//bark_ml/library_wrappers/lib_fqf_iqn_qrdqn/memory:init",
+        "//bark_ml/library_wrappers/lib_fqf_iqn_qrdqn/tests:test_demo_behavior"
     ],
 )
 

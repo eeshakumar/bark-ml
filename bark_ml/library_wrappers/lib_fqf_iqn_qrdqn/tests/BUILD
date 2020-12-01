@@ -16,7 +16,8 @@ py_test(
 
 py_library(
    name = "test_demo_behavior",
-   srcs = ["test_demo_behavior.py"]
+   srcs = ["test_demo_behavior.py"],
+   visibility = ["//visibility:public"],
 )
 
 py_test(
