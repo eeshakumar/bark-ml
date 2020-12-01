@@ -186,10 +186,5 @@ class IQNAgent(BaseAgent):
                                                         weights, self.kappa)
     total_loss = quantile_huber_loss
 
-    # TODO: Get from demonstrator
-    supervised_margin_loss = calculate_supervised_margin_classification_loss(
-      current_q, actions, next_actions, is_demos=is_demos, device=self.device, total_actions=self.action_space._n)
-
-    total_loss += supervised_margin_loss
     return total_loss, next_q.detach().mean().item(), \
         td_errors.detach().abs()
