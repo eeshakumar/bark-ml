@@ -27,7 +27,7 @@ from bark_ml.environments.single_agent_runtime import SingleAgentRuntime
 import bark_ml.environments.gym
 from bark_ml.library_wrappers.lib_fqf_iqn_qrdqn.agent import IQNAgent, FQFAgent, QRDQNAgent
 
-from libs.evaluation.training_benchmark_database import TrainingBenchmarkDatabase
+from bark_ml.library_wrappers.lib_fqf_iqn_qrdqn.agent.training_benchmark_database import TrainingBenchmarkDatabase
 
 class EvaluationTests(unittest.TestCase):
   # make sure the agent works
@@ -38,7 +38,7 @@ class EvaluationTests(unittest.TestCase):
     params["ML"]["BaseAgent"]["MaxEpisodeSteps"] = 2
     params["ML"]["BaseAgent"]["NumEvalEpisodes"] = 2
     train_bench = TrainingBenchmarkDatabase()
-    agent = FQFAgent(env=env, params=params, training_benchmark=train_bench)
+    agent = FQFAgent(env=env, agent_save_dir="./save_dir", params=params, training_benchmark=train_bench)
     agent.train_episode()
     agent.evaluate()
 

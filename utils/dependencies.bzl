@@ -7,6 +7,21 @@ def _maybe(repo_rule, name, **kwargs):
     repo_rule(name = name, **kwargs)
 
 def bark_ml_dependencies():
+
+  _maybe(
+    git_repository,
+    name = "planner_uct",
+    commit = "ee6faee750ec51e72f1d6f3514aae45aa57aaca4",
+    remote = "https://github.com/eeshakumar/bark_hypothesis_uct",
+  )
+
+  _maybe(
+    git_repository,
+    name = "benchmark_database",
+    commit = "ff6e433ecb7878ebe59996f3994ff67483a7c297",
+    remote = "https://github.com/bark-simulator/benchmark-database"
+  )
+
   _maybe(
     git_repository,
     name = "bark_project",
