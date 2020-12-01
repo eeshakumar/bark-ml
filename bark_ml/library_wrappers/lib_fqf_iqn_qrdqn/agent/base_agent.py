@@ -91,15 +91,15 @@ class TrainingBenchmark:
 
 
 class BaseAgent(BehaviorModel):
-  def __init__(self, agent_save_dir=None, env=None, params=None, training_benchmark=None, checkpoint_load=None, 
-               demonstrations = None, demonstrator=None):
+  def __init__(self, agent_save_dir=None, env=None, params=None, training_benchmark=None, checkpoint_load=None,
+               demo_collector = None):
     BehaviorModel.__init__(self, params)
     self._params = params
     self._env = env
     self._training_benchmark = training_benchmark or TrainingBenchmark()
     self._agent_save_dir = agent_save_dir
-    if demonstrator is not None:
-      self.demonstrator = demonstrator
+    if demo_collector is not None:
+      self.demonstrator = demo_collector
     else:
       self.demonstrator = None
     
@@ -190,7 +190,13 @@ class BaseAgent(BehaviorModel):
             self.gamma,
             self.multi_step,
             beta_steps=beta_steps,
-            demo_ratio=self.demonstrator_buffer_params["demo_capacity_ratio"])
+            eps=self.epsilon_train,
+            epsilon_demo=self.demonstrator_buffer_params["epsilon_demo", "", 1.0],
+            epsilon_alpha=self.demonstrator_buffer_params["epsilon_alpha", "", 0.001],
+            alpha=self.demonstrator_buffer_params["alpha", "", 0.4],
+            per_beta_steps=self.demonstrator_buffer_params["per_beta_steps", "", 75000],
+            per_beta=self.demonstrator_buffer_params["per_beta", "", 0.6],
+            demo_ratio=self.demonstrator_buffer_params["demo_capacity_ratio", "", 0.25])
 
     self.steps = 0
     self.learning_steps = 0
@@ -234,6 +240,8 @@ class BaseAgent(BehaviorModel):
 
     if self.demonstrator:
       self.demonstrator_buffer_params = params.AddChild("ML").AddChild("DemonstratorAgent").AddChild("Buffer")
+      self.demonstrator_loss_params = params.AddChild("ML").AddChild("DemonstratorAgent").AddChild("Loss")
+      self.demonstrator_agent_params = params.AddChild("ML").AddChild("DemonstratorAgent").AddChild("Agent")
 
   @property
   def observer(self):
@@ -255,6 +263,26 @@ class BaseAgent(BehaviorModel):
   def agent_save_dir(self):
     return self._agent_save_dir
 
+  def run(self):
+    assert self.demonstrator is not None, "Run invoked incorrectly, demonstrator not found!"
+    demonstrations_save_path = os.path.join(self.agent_save_dir, self.demonstrator_agent_params[
+      "save_demo", "", "demonstrations"])
+    print("Demonstrations will be saved to", demonstrations_save_path)
+    
+    def default_training_evaluators():
+      default_config = {"success" : "EvaluatorGoalReached", "collision_other" : "EvaluatorCollisionEgoAgent",
+          "out_of_drivable" : "EvaluatorDrivableArea", "max_steps": "EvaluatorStepCount"}
+      return default_config
+
+    collection_result = self.demonstrator.CollectDemonstrations(
+      self._env, self._ml_behavior,
+      self.demonstrator_agent_params["num_demo_episodes", "", 3000],
+      demonstrations_save_path,
+      use_mp_runner=False,
+      runner_init_params={"deepcopy": False})
+    demonstrations = self.demonstrator.ProcessCollectionResult(
+      eval_criteria = {"goal_reached": lambda x: x})
+    print("generated demonstrations", len(demonstrations))
 
   def train(self):
     while True:
@@ -417,11 +445,7 @@ class BaseAgent(BehaviorModel):
         logging.info(f"Reward: {reward:<4}")
 
       # To calculate efficiently, I just set priority=max_priority here.
-      # TODO: remove hardcoding that samples are demo samples
-      import random
-      is_demo = random.getrandbits(1)
-      # print("IS DEMO", is_demo)
-      self.memory.append(state, action, reward, next_state, done, True)
+      self.memory.append(state, action, reward, next_state, done)
 
       self.steps += 1
       episode_steps += 1
@@ -444,9 +468,8 @@ class BaseAgent(BehaviorModel):
 
   def train_step_interval(self):
     self.epsilon_train.step()
-    # print("Train Step Interval", self.steps)
-    self.memory.per_beta.step()
-    # print("Stepped Per Beta", self.memory.per_beta.get())
+    if self.demonstrator is not None:
+      self.memory.per_beta.step()
 
     if self.steps % self.target_update_interval == 0:
       self.update_target()
