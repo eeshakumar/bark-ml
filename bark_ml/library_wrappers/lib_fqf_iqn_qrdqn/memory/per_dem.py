@@ -11,17 +11,17 @@ class LazyPrioritizedDemMultiStepMemory(LazyDemMultiStepMemory):
                  device,
                  gamma=0.99,
                  multi_step=3,
-                 alpha=0.5,
+                 alpha=0.4,
                  beta=0.4,
                  beta_steps=2e5,
                  min_pa=0.0,
-                 max_pa=1.0,
+                 max_pa=2.0,
                  eps=0.01,
                  epsilon_demo=1.0,
                  epsilon_alpha=0.001,
                  per_beta=0.6,
-                 per_beta_steps=25000,
-                 demo_ratio=0.25):
+                 per_beta_steps=75000,
+                 demo_ratio=1.0):
         super().__init__(capacity, state_shape, device, gamma, multi_step, demo_ratio)
 
         self.alpha = alpha
