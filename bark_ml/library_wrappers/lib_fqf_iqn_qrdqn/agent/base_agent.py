@@ -190,6 +190,7 @@ class BaseAgent(BehaviorModel):
       self.use_per = True
       beta_steps = (self.num_steps - self.start_steps) / \
         self.update_interval
+      # initially all memory expects only demo samples
       self.memory = LazyPrioritizedDemMultiStepMemory(
             self.memory_size,
             self.observer.observation_space.shape,
@@ -197,13 +198,11 @@ class BaseAgent(BehaviorModel):
             self.gamma,
             self.multi_step,
             beta_steps=beta_steps,
-            eps=self.epsilon_train,
             epsilon_demo=self.demonstrator_buffer_params["epsilon_demo", "", 1.0],
             epsilon_alpha=self.demonstrator_buffer_params["epsilon_alpha", "", 0.001],
             alpha=self.demonstrator_buffer_params["alpha", "", 0.4],
             per_beta_steps=self.demonstrator_buffer_params["per_beta_steps", "", 75000],
-            per_beta=self.demonstrator_buffer_params["per_beta", "", 0.6],
-            demo_ratio=self.demonstrator_buffer_params["demo_capacity_ratio", "", 0.25])
+            per_beta=self.demonstrator_buffer_params["per_beta", "", 0.6])
 
     self.steps = 0
     self.learning_steps = 0
@@ -323,30 +322,40 @@ class BaseAgent(BehaviorModel):
     #TODO: evaluator criteria must be updated
     demonstrations = self.demonstrator.ProcessCollectionResult(
       eval_criteria = {"goal_r1": lambda x: x})
-    print(type(demonstrations), demonstrations)
     # TODO: Remove this reassignment
     self._env._evaluator = real_evaluator
 
     # Extract and append demonstrations to memory
     for demo in demonstrations:
       (state, action, reward, next_state, done, is_demo) = demo
-      self.memory.append(state, action, reward, next_state, done, is_demo)
+      self.memory.append(state, action % 8, reward, next_state, done, is_demo)
 
     assert self.memory._n == len(demonstrations)
-    assert self.memory._dn == len(demonstrations)
+    assert self.memory.is_full(), "Memory not filled with demonstrations"
 
     self.online_gradient_update_steps = self.demonstrator_agent_params["online_gradient_update_steps", "", 75000]
     self.train_on_demonstrations()
 
-    self.save()
+    # save trained online agent
+    self.save(checkpoint_type="online")
+    self.memory.reset_offline(self.memory_size, self.observer.observation_space.shape, 
+                              self.device,
+                              self.demonstrator_buffer_params["demo_ratio"])
+    self.train_episodes()
 
   def train_on_demonstrations(self):
     while True:
-      self.train_step_interval()
+      self.train_step_interval(is_online=True)
       if self.steps > self.online_gradient_update_steps:
         print("Initial gradient updates completed. Totoal episodes", self.episodes)
         break
-    self.set_action_externally = True
+
+  def train_episodes(self):
+    total_episodes = self._params["Experiment"]["num_episodes"]
+    while True:
+      self.train_episode()
+      if self.episodes >= total_episodes:
+        break
 
   def train(self):
     while True:
@@ -509,7 +518,10 @@ class BaseAgent(BehaviorModel):
         logging.info(f"Reward: {reward:<4}")
 
       # To calculate efficiently, I just set priority=max_priority here.
-      self.memory.append(state, action, reward, next_state, done)
+      if self.demonstrator is not None:
+        self.memory.append(state, action, reward, next_state, done, False)
+      else:
+        self.memory.append(state, action, reward, next_state, done)
 
       self.steps += 1
       episode_steps += 1
@@ -530,7 +542,9 @@ class BaseAgent(BehaviorModel):
                  f'episode steps: {episode_steps:<4}  '
                  f'return: {episode_return:<5.1f}')
 
-  def train_step_interval(self):
+  def train_step_interval(self, is_online=True):
+    if is_online:
+      self.steps += 1
     self.epsilon_train.step()
     if self.demonstrator is not None:
       self.memory.per_beta.step()
