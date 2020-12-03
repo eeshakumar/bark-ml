@@ -27,9 +27,6 @@ from bark_ml.behaviors.discrete_behavior import BehaviorDiscreteMacroActionsML
 
 # TODO: Imports to remove
 from bark.runtime.commons.parameters import ParameterServer
-from bark_ml.library_wrappers.lib_fqf_iqn_qrdqn.\
-            tests.test_demo_behavior import TestDemoBehavior
-from bark_ml.evaluators.evaluator import StateEvaluator
 
 
 # BARK imports
@@ -99,16 +96,13 @@ class TrainingBenchmark:
 
 class BaseAgent(BehaviorModel):
   def __init__(self, agent_save_dir=None, env=None, params=None, training_benchmark=None, checkpoint_load=None,
-               demo_collector = None):
+               is_learn_from_demonstrations = False):
     BehaviorModel.__init__(self, params)
     self._params = params
     self._env = env
     self._training_benchmark = training_benchmark or TrainingBenchmark()
     self._agent_save_dir = agent_save_dir
-    if demo_collector is not None:
-      self.demonstrator = demo_collector
-    else:
-      self.demonstrator = None
+    self.is_learn_from_demonstrations = is_learn_from_demonstrations
 
     if not checkpoint_load and params:
       if not env:
@@ -167,7 +161,7 @@ class BaseAgent(BehaviorModel):
 
   def reset_training_variables(self):
     # Replay memory which is memory-efficient to store stacked frames.
-    if self.demonstrator is None:
+    if not self.is_learn_from_demonstrations:
       if self.use_per:
         beta_steps = (self.num_steps - self.start_steps) / \
               self.update_interval
@@ -244,10 +238,11 @@ class BaseAgent(BehaviorModel):
 
     self.use_cuda = params["ML"]["BaseAgent"]["Cuda", "", False]
 
-    if self.demonstrator:
+    if self.is_learn_from_demonstrations:
       self.demonstrator_buffer_params = params.AddChild("ML").AddChild("DemonstratorAgent").AddChild("Buffer")
       self.demonstrator_loss_params = params.AddChild("ML").AddChild("DemonstratorAgent").AddChild("Loss")
       self.demonstrator_agent_params = params.AddChild("ML").AddChild("DemonstratorAgent").AddChild("Agent")
+      self.online_gradient_update_steps = self.demonstrator_agent_params["online_gradient_update_steps", "", 75000]
 
   @property
   def observer(self):
@@ -269,75 +264,24 @@ class BaseAgent(BehaviorModel):
   def agent_save_dir(self):
     return self._agent_save_dir
 
-  def run(self):
-    assert self.demonstrator is not None, "Run invoked incorrectly, demonstrator not found!"
-
-    # TODO: Remove this evaluator
-    class TestEvaluator(StateEvaluator):
-      reach_goal = True
-      def __init__(self,
-                  params=ParameterServer()):
-        StateEvaluator.__init__(self, params)
-        self.step = 0
-
-      def _evaluate(self, observed_world, eval_results, action):
-        """Returns information about the current world state
-        """
-        done = False
-        reward = 0.0
-        info = {"goal_r1" : False}
-        if self.step > 2:
-          done = True
-          if self.reach_goal:
-            reward = 0.1
-            info = {"goal_r1" : True}
-        self.step += 1
-        return reward, done, info
-
-      def Reset(self, world):
-        self._step = 0
-        #every second scenario goal is not reached
-        TestEvaluator.reach_goal = not TestEvaluator.reach_goal
-
-    demonstrations_save_path = os.path.join(self.agent_save_dir, self.demonstrator_agent_params[
-      "save_demo", "", "demonstrations"])
-    print("Demonstrations will be saved to", demonstrations_save_path)
-
-    def default_training_evaluators():
-      default_config = {"success" : "EvaluatorGoalReached", "collision_other" : "EvaluatorCollisionEgoAgent",
-          "out_of_drivable" : "EvaluatorDrivableArea", "max_steps": "EvaluatorStepCount"}
-      return default_config
-
-    #TODO: Demonstrator behavior must be updated/passed
-    demo_behavior = TestDemoBehavior(self._params)
-    #TODO: Evaluator must not be a TestEvaluator
-    real_evaluator = self._env._evaluator
-    self._env._evaluator = TestEvaluator()
-    collection_result = self.demonstrator.CollectDemonstrations(
-      self._env, demo_behavior,
-      self.demonstrator_agent_params["num_demo_episodes", "", 3000],
-      demonstrations_save_path,
-      use_mp_runner=False,
-      runner_init_params={"deepcopy": False})
-    #TODO: evaluator criteria must be updated
-    demonstrations = self.demonstrator.ProcessCollectionResult(
-      eval_criteria = {"goal_r1": lambda x: x})
-    # TODO: Remove this reassignment
-    self._env._evaluator = real_evaluator
+  def learn_from_demonstrations(self, demonstrations):
+    self.demonstrations = demonstrations
+    self.save(checkpoint_type="configured_with_demonstrations")
+    assert self.is_learn_from_demonstrations, "Learn from demonstration params not set!"
+    assert self.demonstrations is not None, "Run invoked incorrectly, demonstrator not found!"
 
     # Extract and append demonstrations to memory
-    for demo in demonstrations:
+    for demo in self.demonstrations:
       (state, action, reward, next_state, done, is_demo) = demo
       self.memory.append(state, action % 8, reward, next_state, done, is_demo)
 
-    assert self.memory._n == len(demonstrations)
+    assert self.memory._n == len(self.demonstrations)
     assert self.memory.is_full(), "Memory not filled with demonstrations"
 
-    self.online_gradient_update_steps = self.demonstrator_agent_params["online_gradient_update_steps", "", 75000]
     self.train_on_demonstrations()
 
     # save trained online agent
-    self.save(checkpoint_type="online")
+    self.save(checkpoint_type="trained_only_demonstrations")
     self.memory.reset_offline(self.memory_size, self.observer.observation_space.shape, 
                               self.device,
                               self.demonstrator_buffer_params["demo_ratio"])
@@ -345,7 +289,7 @@ class BaseAgent(BehaviorModel):
 
   def train_on_demonstrations(self):
     while True:
-      self.train_step_interval(is_online=True)
+      self.train_step_interval(demo_only=True)
       if self.steps > self.online_gradient_update_steps:
         print("Initial gradient updates completed. Totoal episodes", self.episodes)
         break
@@ -518,7 +462,7 @@ class BaseAgent(BehaviorModel):
         logging.info(f"Reward: {reward:<4}")
 
       # To calculate efficiently, I just set priority=max_priority here.
-      if self.demonstrator is not None:
+      if self.is_learn_from_demonstrations:
         self.memory.append(state, action, reward, next_state, done, False)
       else:
         self.memory.append(state, action, reward, next_state, done)
@@ -542,11 +486,11 @@ class BaseAgent(BehaviorModel):
                  f'episode steps: {episode_steps:<4}  '
                  f'return: {episode_return:<5.1f}')
 
-  def train_step_interval(self, is_online=True):
-    if is_online:
+  def train_step_interval(self, demo_only=True):
+    if demo_only:
       self.steps += 1
     self.epsilon_train.step()
-    if self.demonstrator is not None:
+    if self.is_learn_from_demonstrations:
       self.memory.per_beta.step()
 
     if self.steps % self.target_update_interval == 0:
