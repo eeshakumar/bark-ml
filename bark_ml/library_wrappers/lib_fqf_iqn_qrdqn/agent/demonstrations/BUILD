@@ -1,6 +1,7 @@
 py_library(
     name = "demonstrations",
     srcs = ["demonstration_collector.py",
+            "demonstration_generator.py",
             "__init__.py"
             ],
     deps = [
