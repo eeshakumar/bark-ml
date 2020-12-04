@@ -75,7 +75,7 @@ class IQNAgent(BaseAgent):
     self.target_net.sample_noise()
 
     if self.use_per:
-      if self.demonstrator is not None:
+      if self.is_learn_from_demonstrations:
         (states, actions, rewards, next_states, dones, is_demos), weights = \
         self.memory.sample(self.batch_size)
       else:
@@ -92,7 +92,7 @@ class IQNAgent(BaseAgent):
     # Calculate features of states.
     state_embeddings = self.online_net.calculate_state_embeddings(states)
 
-    if self.demonstrator is not None:
+    if self.is_learn_from_demonstrations:
       quantile_loss, mean_q, errors = self.calculate_loss(
           state_embeddings, actions, rewards, next_states, dones, weights, states, is_demos)
     else:
@@ -106,7 +106,7 @@ class IQNAgent(BaseAgent):
                   grad_cliping=self.grad_cliping)
 
     if self.use_per:
-      if self.demonstrator is not None:
+      if self.is_learn_from_demonstrations:
         self.memory.update_priority(errors, is_demos)
       else:
         self.memory.update_priority(errors)
