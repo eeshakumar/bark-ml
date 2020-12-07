@@ -264,34 +264,37 @@ class BaseAgent(BehaviorModel):
   def agent_save_dir(self):
     return self._agent_save_dir
 
-  def learn_from_demonstrations(self, demonstrations):
-    self.demonstrations = demonstrations
-    self.save(checkpoint_type="configured_with_demonstrations")
-    assert self.is_learn_from_demonstrations, "Learn from demonstration params not set!"
-    assert self.demonstrations is not None, "Run invoked incorrectly, demonstrator not found!"
+  def learn_from_demonstrations(self, demonstrations, learn_only=False):
+    if learn_only:
+      self.demonstrations = demonstrations
+      self.save(checkpoint_type="configured_with_demonstrations")
+      assert self.is_learn_from_demonstrations, "Learn from demonstration params not set!"
+      assert self.demonstrations is not None, "Run invoked incorrectly, demonstrator not found!"
 
-    # Extract and append demonstrations to memory
-    for demo in self.demonstrations:
-      (state, action, reward, next_state, done, is_demo) = demo
-      self.memory.append(state, action % 8, reward, next_state, done, is_demo)
+      # Extract and append demonstrations to memory
+      for demo in self.demonstrations:
+        (state, action, reward, next_state, done, is_demo) = demo
+        self.memory.append(state, action % 8, reward, next_state, done, is_demo)
 
-    assert self.memory._n == len(self.demonstrations)
-    assert self.memory.is_full(), "Memory not filled with demonstrations"
+      assert self.memory._n == len(self.demonstrations)
+      assert self.memory.is_full(), "Memory not filled with demonstrations"
 
-    self.train_on_demonstrations()
+      self.train_on_demonstrations()
 
-    # save trained online agent
-    self.save(checkpoint_type="trained_only_demonstrations")
-    self.memory.reset_offline(self.memory_size, self.observer.observation_space.shape, 
-                              self.device,
-                              self.demonstrator_buffer_params["demo_ratio"])
-    self.train_episodes()
+      # save trained online agent
+      self.save(checkpoint_type="trained_only_demonstrations")
+    # if learn_only is False, load from previous training checkpoint, explore and learn
+    else:
+      self.memory.reset_offline(self.memory_size, self.observer.observation_space.shape, 
+                                self.device,
+                                self.demonstrator_buffer_params["demo_ratio"])
+      self.train_episodes()
 
   def train_on_demonstrations(self):
     while True:
       self.train_step_interval(demo_only=True)
       if self.steps > self.online_gradient_update_steps:
-        print("Initial gradient updates completed. Totoal episodes", self.episodes)
+        print("Initial gradient updates completed. Totoal steps", self.steps)
         break
 
   def train_episodes(self):
