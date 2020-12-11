@@ -264,7 +264,7 @@ class BaseAgent(BehaviorModel):
   def agent_save_dir(self):
     return self._agent_save_dir
 
-  def learn_from_demonstrations(self, demonstrations, learn_only=False):
+  def learn_from_demonstrations(self, demonstrations, learn_only=False, num_episodes=50000):
     if learn_only:
       self.demonstrations = demonstrations
       self.save(checkpoint_type="configured_with_demonstrations")
@@ -274,7 +274,7 @@ class BaseAgent(BehaviorModel):
       # Extract and append demonstrations to memory
       for demo in self.demonstrations:
         (state, action, reward, next_state, done, is_demo) = demo
-        self.memory.append(state, action % 8, reward, next_state, done, is_demo)
+        self.memory.append(state, action, reward, next_state, done, is_demo)
 
       assert self.memory._n == len(self.demonstrations)
       assert self.memory.is_full(), "Memory not filled with demonstrations"
@@ -288,7 +288,7 @@ class BaseAgent(BehaviorModel):
       self.memory.reset_offline(self.memory_size, self.observer.observation_space.shape, 
                                 self.device,
                                 self.demonstrator_buffer_params["demo_ratio"])
-      self.train_episodes()
+      self.train_episodes(num_episodes=num_episodes)
 
   def train_on_demonstrations(self):
     while True:
@@ -297,11 +297,10 @@ class BaseAgent(BehaviorModel):
         print("Initial gradient updates completed. Totoal steps", self.steps)
         break
 
-  def train_episodes(self):
-    total_episodes = self._params["Experiment"]["num_episodes"]
+  def train_episodes(self, num_episodes=50000):
     while True:
       self.train_episode()
-      if self.episodes >= total_episodes:
+      if self.episodes >= num_episodes:
         break
 
   def train(self):

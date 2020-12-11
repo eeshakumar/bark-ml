@@ -50,7 +50,7 @@ class DemonstrationEvaluator(BaseEvaluator):
     return self._nn_observer.Observe(observed_world)
 
   def GetAction(self, observed_world):
-    return observed_world.agents[self._agent_id].behavior_model.GetLastAction()
+    return observed_world.agents[self._agent_id].behavior_model.GetLastMacroAction()
 
   def GetStepEvaluation(self, observed_world, action):
     return self._reward_evaluator.Evaluate(observed_world, action)
@@ -99,10 +99,10 @@ class DemonstrationCollector:
   def _GetDefaultRunnerInitParams(self):
     return {"log_eval_avg_every" : 5}
 
-  def _GetDefaultRunnerRunParams(self):
-    return {"maintain_history" : False, "checkpoint_every" : 10, "viewer" : None}
+  def _GetDefaultRunnerRunParams(self, env, use_mp_runner):
+    return {"maintain_history" : False, "checkpoint_every" : 10, "viewer" : None if use_mp_runner else env._viewer}
 
-  def CollectDemonstrations(self, env, demo_behavior, num_episodes, directory, use_mp_runner=True, runner_init_params = None,
+  def CollectDemonstrations(self, env, demo_behavior, num_scenarios, directory, use_mp_runner=True, runner_init_params = None,
       runner_run_params=None):
     demo_evaluator = DemonstrationEvaluator(env._observer, env._evaluator)
     evaluators = {**default_training_evaluators(), "demo_evaluator" : demo_evaluator}
@@ -110,14 +110,38 @@ class DemonstrationCollector:
 
     runner_init_params_def = self._GetDefaultRunnerInitParams()
     runner_init_params_def.update(runner_init_params or {})
+
+
+    if "hy_slurm_num_cpus" in os.environ:
+      num_cpus = int(os.environ["hy_slurm_num_cpus"])
+      memory = int(os.environ["hy_slurm_memory"])
+      logging.info("Cpus={} and memory={} based on environment variables.".format(num_cpus, memory))
+    else:
+      memory = 100010241024 # 32gb
+      num_cpus=11
+
+    benchmark_runner = BenchmarkRunnerMP(benchmark_database = db,
+                                        evaluators = evaluators,
+                                        terminal_when = terminal_when,
+                                        benchmark_configs = benchmark_configs,
+                                        num_scenarios=num_scenarios,
+                                      glog_init_settings={"vlevel": 0},
+                                      log_eval_avg_every = 5,
+                                      checkpoint_dir = "checkpoints",
+                                        merge_existing = False,
+                                      memory_total=memory,
+                                      num_cpus=num_cpus)
+
     runner_type = BenchmarkRunnerMP if use_mp_runner else BenchmarkRunner
     runner = runner_type(evaluators=evaluators,
-                                  scenario_generation=env._scenario_generator,
-                                  terminal_when=terminal_when,
-                                  behaviors={"demo_behavior" : demo_behavior},
-                                  num_scenarios = num_episodes,
-                                  **runner_init_params_def)
-    runner_run_params_def = self._GetDefaultRunnerRunParams()
+                         scenario_generation=env._scenario_generator,
+                         terminal_when=terminal_when,
+                         behaviors={"demo_behavior" : demo_behavior},
+                         num_scenarios = num_scenarios,
+                         memory_total=memory,
+                         num_cpus=num_cpus,
+                         **runner_init_params_def)
+    runner_run_params_def = self._GetDefaultRunnerRunParams(env, use_mp_runner)
     runner_run_params_def.update(runner_run_params or {})
     self._collection_result = runner.run(**runner_run_params_def)
     self.dump(directory)
@@ -161,6 +185,7 @@ class DemonstrationCollector:
     self._demonstrations = []
     for index, row in data_frame.iterrows():
       demo_eval_result, done, info = row["demo_evaluator"]
+      # print("Info", info)
       use_scenario = True
       for crit, func in eval_criteria.items():
         use_scenario = use_scenario and func(info[crit])

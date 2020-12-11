@@ -15,7 +15,8 @@ from torch.optim import Adam
 from bark_ml.library_wrappers.lib_fqf_iqn_qrdqn.model import IQN
 from bark_ml.library_wrappers.lib_fqf_iqn_qrdqn.utils \
  import disable_gradients, update_params, \
- calculate_quantile_huber_loss, calculate_supervised_margin_classification_loss, evaluate_quantile_at_action
+ calculate_quantile_huber_loss, calculate_supervised_margin_classification_loss, \
+ calculate_supervised_classification_quantile_loss, evaluate_quantile_at_action
 from .base_agent import BaseAgent
 
 
@@ -52,10 +53,18 @@ class IQNAgent(BaseAgent):
     # Disable calculations of gradients of the target network.
     disable_gradients(self.target_net)
 
-    self.optim = Adam(self.online_net.parameters(),
+    # if demonstrated run, weight parameter for l2 loss here
+    if self.is_learn_from_demonstrations:
+      self.optim = Adam(self.online_net.parameters(),
                        lr=self._params["ML"]["IQNAgent"]["LearningRate", "",
                                                          5e-5],
-                       eps=1e-2 / self.batch_size)
+                       eps=1e-2 / self.batch_size,
+                       weight_decay=self.demonstrator_loss_params["l2_weight_decay"])
+    else:
+      self.optim = Adam(self.online_net.parameters(),
+                        lr=self._params["ML"]["IQNAgent"]["LearningRate", "",
+                                                          5e-5],
+                        eps=1e-2 / self.batch_size)
 
   def clean_pickables(self, pickables):
     super(IQNAgent, self).clean_pickables(pickables)
@@ -130,7 +139,8 @@ class IQNAgent(BaseAgent):
 
     # get current q values from network
     self.online_net.sample_noise()
-    current_q = self.online_net.calculate_q(states=states)
+    current_q = self.target_net.calculate_q(states=states)
+    # print("Current Q", current_q.shape)
 
     # Calculate quantile values of current states and actions at tau_hats.
     current_sa_quantiles = evaluate_quantile_at_action(
@@ -185,6 +195,16 @@ class IQNAgent(BaseAgent):
     quantile_huber_loss = calculate_quantile_huber_loss(td_errors, taus,
                                                         weights, self.kappa)
     total_loss = quantile_huber_loss
+
+    if self.is_learn_from_demonstrations:
+      assert is_demos is not None
+      supervised_classification_loss = calculate_supervised_classification_quantile_loss(
+        actions, states, self.target_net, taus, state_embeddings, is_demos,
+        self.action_space._n, self.device, 
+        self.demonstrator_loss_params["supervised_margin_weight", "", 0.5],
+        self.demonstrator_loss_params["expert_margin", "", 0.8]
+      )
+      total_loss += supervised_classification_loss
 
     return total_loss, next_q.detach().mean().item(), \
         td_errors.detach().abs()

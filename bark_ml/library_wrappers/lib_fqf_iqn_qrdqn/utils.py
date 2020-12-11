@@ -29,17 +29,6 @@ def get_onehot(input_list, columns):
   return input_onehot
 
 
-# def get_action_margins_loss(actions, predicted_actions, total_actions, is_demos, margin=0.5):
-#   assert actions.shape == predicted_actions.shape
-#   sampled_demonstrator_actions = actions * is_demos
-#   sampled_agent_actions = actions * (1 - is_demos)
-#   one_hot_demonstrations = get_onehot(sampled_demonstrator_actions, total_actions)
-#   one_hot_agent_actions = get_onehot(sampled_agent_actions, total_actions)
-#   action_margin_loss = np.zeros((actions.shape[0], total_actions))
-#   action_margin_loss[one_hot_demonstrations != one_hot_agent_actions] = margin
-#   print(action_margin_loss)
-#   return torch.from_numpy(action_margin_loss).float().to(sampled_agent_actions.device)
-
 def get_margin_loss(actions, total_actions, is_demos, margin, device):
   margins = (torch.ones(total_actions, total_actions) - torch.eye(total_actions)) * margin
   sampled_batch_margins = margins[actions.long()] 
@@ -50,8 +39,9 @@ def calculate_huber_loss(td_errors, kappa=1.0):
   return torch.where(td_errors.abs() <= kappa, 0.5 * td_errors.pow(2),
                      kappa * (td_errors.abs() - 0.5 * kappa))
 
+
 def calculate_supervised_margin_classification_loss(current_q, actions, predicted_actions, total_actions, is_demos, device, 
-                                                    margin=0.5):
+                                                    margin=0.8):
   """supervised margin loss to force Q value of all non expert actions to be lower"""
   sampled_batch_margin_loss = get_margin_loss(actions, total_actions, is_demos, margin, device)
   assert sampled_batch_margin_loss.shape == current_q.shape
@@ -63,6 +53,52 @@ def calculate_supervised_margin_classification_loss(current_q, actions, predicte
   loss = is_demos * (q1 - q2)
   # net loss is mean of batch loss
   assert loss.shape == actions.shape
+  return loss.mean()
+
+
+def calculate_supervised_classification_quantile_loss(actions, states, target_net, taus, state_embeddings,
+                                                      is_demos, total_actions, device,
+                                                      supervised_margin_weight=0.5, expert_margin=0.8):
+  #get q values from target network
+  curr_target_q = target_net.calculate_q(states=states)
+
+  # is_demos = torch.from_numpy(np.array([1, 0, 1, 1]))
+  # is_demos = is_demos.to(device)
+
+  #get greedy actions from current q values
+  curr_target_q_actions = torch.argmax(curr_target_q, dim=1, keepdim=True)
+
+  #get quantiles for all actions
+  curr_target_quantiles = target_net.calculate_quantiles(taus, 
+                                                            state_embeddings=state_embeddings)
+
+  # print("Current target quantiles", curr_target_quantiles.shape)
+  curr_target_quantiles_by_action = evaluate_quantile_at_action(
+    curr_target_quantiles,
+    curr_target_q_actions
+  )
+  # print("Target quantiles by actions", curr_target_quantiles_by_action.shape)
+
+  #q value is then the mean of the quantiles Q(s, a)
+  curr_target_quantiles_by_action_q = curr_target_quantiles_by_action.mean(axis=1)
+  # print("Curr target quantiles q by action", curr_target_quantiles_by_action_q.shape)
+
+  curr_target_quantiles_q = curr_target_quantiles.mean(axis=1)
+  # print("Curr target quantiles all actions", curr_target_quantiles_q.shape)
+
+  sampled_batch_margin_loss = get_margin_loss(actions, total_actions, is_demos, expert_margin, device)
+  # print("Sampled margin loss shape", sampled_batch_margin_loss.shape)
+  q1, _ = torch.max(curr_target_quantiles_q + sampled_batch_margin_loss, axis=1)
+  # print("Curr target quantiles q max", q1.shape)
+
+  weights = supervised_margin_weight * is_demos
+  # print("Calculated weights", weights)
+  q2 = torch.diag(curr_target_quantiles_q[torch.arange(curr_target_quantiles_q.size(0)), actions.long()])
+
+  loss = q1 - q2
+  # print("Unweighted loss", loss)
+  loss = weights * loss
+  # print("weighted loss", loss)
   return loss.mean()
 
 
