@@ -15,14 +15,15 @@ class DemonstrationGenerator(object):
         return self._demonstrations
 
     def generate_demonstrations(self, num_episodes, eval_criteria, save_dir=None,
-                                gen_file="generated_demonstrations"):
+                                gen_file="generated_demonstrations", use_mp_runner=True):
         if save_dir is None:
             save_dir = self._save_dir
 
         demo_path = os.path.join(save_dir, gen_file)
         collection_result = self._collector.CollectDemonstrations(
-            self._env, self._behavior, num_episodes, demo_path, use_mp_runner=False,
-            runner_init_params={"deepcopy": False})
+            self._env, self._behavior, num_episodes, demo_path, use_mp_runner=use_mp_runner,
+            runner_init_params= None if use_mp_runner else {"deepcopy": False})
+
         self._collector.ProcessCollectionResult(eval_criteria)
         self._demonstrations = self._collector.GetDemonstrationExperiences()
         return self._demonstrations

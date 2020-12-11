@@ -29,7 +29,7 @@ class TestDemoBehavior(BehaviorModel):
   def Clone(self):
     return self
 
-  def GetLastAction(self):
+  def GetLastMacroAction(self):
     return 22
 
   def __setstate__(self, d):
