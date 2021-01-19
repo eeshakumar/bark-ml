@@ -45,6 +45,10 @@ class DQNBase(nn.Module):
     self.net = nn.Sequential(
         torch.nn.Linear(num_channels, hidden),
         torch.nn.ReLU(),
+        torch.nn.Linear(hidden, hidden),
+        torch.nn.ReLU(),
+        torch.nn.Linear(hidden, hidden),
+        torch.nn.ReLU(),
         torch.nn.Linear(hidden, embedding_dim),
     ).apply(initialize_weights_he)
 
