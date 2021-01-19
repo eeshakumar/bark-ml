@@ -56,49 +56,55 @@ def calculate_supervised_margin_classification_loss(current_q, actions, predicte
   return loss.mean()
 
 
-def calculate_supervised_classification_quantile_loss(actions, states, target_net, taus, state_embeddings,
+def calculate_supervised_classification_quantile_loss(actions, states, target_net, tau_dashes, state_embeddings,
                                                       is_demos, total_actions, device,
                                                       supervised_margin_weight=0.5, expert_margin=0.8):
-  #get q values from target network
-  curr_target_q = target_net.calculate_q(states=states)
+  # #get q values from target network
+  # curr_target_q = target_net.calculate_q(states=states)
+  # print("Calculated q", curr_target_q.shape)
 
-  # is_demos = torch.from_numpy(np.array([1, 0, 1, 1]))
-  # is_demos = is_demos.to(device)
+  # #get greedy actions from current q values
+  # curr_target_q_actions = torch.argmax(curr_target_q, dim=1, keepdim=True)
 
-  #get greedy actions from current q values
-  curr_target_q_actions = torch.argmax(curr_target_q, dim=1, keepdim=True)
+  # #get quantiles for all actions
+  # curr_target_quantiles = target_net.calculate_quantiles(taus, 
+  #                                                           state_embeddings=state_embeddings)
 
-  #get quantiles for all actions
-  curr_target_quantiles = target_net.calculate_quantiles(taus, 
-                                                            state_embeddings=state_embeddings)
+  # # print("Current target quantiles", curr_target_quantiles.shape)
+  # curr_target_quantiles_by_action = evaluate_quantile_at_action(
+  #   curr_target_quantiles,
+  #   curr_target_q_actions
+  # )
 
-  # print("Current target quantiles", curr_target_quantiles.shape)
-  curr_target_quantiles_by_action = evaluate_quantile_at_action(
-    curr_target_quantiles,
-    curr_target_q_actions
-  )
-  # print("Target quantiles by actions", curr_target_quantiles_by_action.shape)
+  # #q value is then the mean of the quantiles Q(s, a)
+  # curr_target_quantiles_by_action_q = curr_target_quantiles_by_action.mean(axis=1)
 
-  #q value is then the mean of the quantiles Q(s, a)
-  curr_target_quantiles_by_action_q = curr_target_quantiles_by_action.mean(axis=1)
-  # print("Curr target quantiles q by action", curr_target_quantiles_by_action_q.shape)
-
-  curr_target_quantiles_q = curr_target_quantiles.mean(axis=1)
-  # print("Curr target quantiles all actions", curr_target_quantiles_q.shape)
+  # curr_target_quantiles_q = curr_target_quantiles.mean(axis=1)
 
   sampled_batch_margin_loss = get_margin_loss(actions, total_actions, is_demos, expert_margin, device)
-  # print("Sampled margin loss shape", sampled_batch_margin_loss.shape)
-  q1, _ = torch.max(curr_target_quantiles_q + sampled_batch_margin_loss, axis=1)
+  # q1, _ = torch.max(curr_target_quantiles_by_action_q + sampled_batch_margin_loss, axis=1)
   # print("Curr target quantiles q max", q1.shape)
 
-  weights = supervised_margin_weight * is_demos
+  weights = supervised_margin_weight * is_demos.squeeze()
   # print("Calculated weights", weights)
-  q2 = torch.diag(curr_target_quantiles_q[torch.arange(curr_target_quantiles_q.size(0)), actions.long()])
+  # q2 = torch.diag(curr_target_quantiles_q[torch.arange(curr_target_quantiles_q.size(0)), actions.long()])
 
+  current_quantiles_target = target_net.calculate_quantiles(state_embeddings=state_embeddings, taus=tau_dashes)
+  q = current_quantiles_target.mean(dim=1)
+  # assert current_quantiles_target.shape == ()
+  # print("Non norm ", q)
+  # q = q / q.sum(axis=1, keepdim=True)
+  # print("Norm q", q)
+  # print("Target q values", (q.detach() > 1).float().sum(dim=1).sum())
+
+  q1, _ = torch.max(q + sampled_batch_margin_loss, axis=1)
+  q2 = q.gather(1, actions.long()).squeeze()
+  # print("Q1", q1)
+  # print("Q2", q2)
   loss = q1 - q2
-  # print("Unweighted loss", loss)
+  # print("Unweighted margin loss", loss, weights)
   loss = weights * loss
-  # print("weighted loss", loss)
+  # print("weighted margin loss", loss)
   return loss.mean()
 
 
@@ -125,6 +131,7 @@ def calculate_quantile_huber_loss(td_errors, taus, weights=None, kappa=1.0):
   else:
     quantile_huber_loss = batch_quantile_huber_loss.mean()
 
+  print("Quantile huber loss", quantile_huber_loss)
   return quantile_huber_loss
 
 
