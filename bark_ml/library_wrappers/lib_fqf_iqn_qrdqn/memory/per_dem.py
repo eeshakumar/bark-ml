@@ -15,7 +15,7 @@ class LazyPrioritizedDemMultiStepMemory(LazyDemMultiStepMemory):
                  beta=0.4,
                  beta_steps=2e5,
                  min_pa=0.0,
-                 max_pa=2.0,
+                 max_pa=1.0,
                  eps=0.01,
                  epsilon_demo=1.0,
                  epsilon_alpha=0.001,
@@ -46,9 +46,9 @@ class LazyPrioritizedDemMultiStepMemory(LazyDemMultiStepMemory):
 
     def _pa(self, p, is_demos):
         # take epsilon_demo when is_demo is 1, else take epsilon_alpha
-        eps = self.eps + self.epsilon_demo * is_demos + self.epsilon_alpha * (1.0 - is_demos)
-        clipped_p =  np.clip((p + eps) ** self.alpha, self.min_pa, self.max_pa)
-        return clipped_p
+        eps = np.where(is_demos, self.epsilon_demo, self.epsilon_alpha)# self.eps + self.epsilon_demo * is_demos + self.epsilon_alpha * (1.0 - is_demos)
+        total_p = ((p + eps) ** self.alpha) / np.sum((p + eps) ** self.alpha)
+        return total_p
 
     def append(self, state, action, reward, next_state, done, is_demo, p=None):
         # print("LazyPrioritizedDemMultiStepMemory Append")
@@ -62,11 +62,9 @@ class LazyPrioritizedDemMultiStepMemory(LazyDemMultiStepMemory):
             pa = self._pa(p, is_demo)
 
         if self.multi_step != 1:
-            # print("Buff length", len(self.buff))
             self.buff.append(state, action, reward, is_demo)
 
             if self.buff.is_full():
-                # print("Buff is full, get and append to replay")
                 state, action, reward, is_demo = self.buff.get(self.gamma)
                 self._append(state, action, reward, next_state, done, is_demo, pa)
 
@@ -85,11 +83,8 @@ class LazyPrioritizedDemMultiStepMemory(LazyDemMultiStepMemory):
 
     def _sample_idxes(self, batch_size):
         total_pa = self.it_sum.sum(0, self._n)
-        # print("Total pa", total_pa)
         rands = np.random.rand(batch_size) * total_pa
-        # print("Rands", rands, [self.it_sum.find_prefixsum_idx(r) for r in rands])
         indices = [self.it_sum.find_prefixsum_idx(r) for r in rands]
-        self.beta = min(1., self.beta + self.beta_diff)
         return indices
 
     def sample(self, batch_size):
@@ -103,27 +98,20 @@ class LazyPrioritizedDemMultiStepMemory(LazyDemMultiStepMemory):
         return batch, weights
 
     def _calc_weights(self, indices):
-        # min_pa = self.it_min.min()
-        # weights = [(self.it_sum[i] / min_pa)**-self.beta for i in indices]
-        # print("INDICES", indices, "STORED PRIORITIES", [self.it_sum[i] for i in indices])
-        weights = [(self.it_sum[i] * self._n) ** -self.per_beta.get() for i in indices]
-        # print("Weights", weights)
+        weights = [(self.it_sum[i] * self.capacity) ** -self.per_beta.get() for i in indices]
+        weights = weights / np.sum(weights)
         return torch.FloatTensor(weights).to(self.device).view(-1, 1)
 
     def update_priority(self, errors, is_demos):
         #TODO: change priority equation.
         assert self._cached is not None, "No Elements were sampled"
-        # print("Is demos passed", is_demos)
         is_demos_expanded = torch.zeros(errors.shape)
         for i in range(is_demos.shape[0]):
             is_demos_expanded[i,:,:] = is_demos[i]
         ps = errors.detach().cpu().abs().numpy().flatten()
-        # print("Errors detatched", ps)
         is_demos = is_demos_expanded.detach().cpu().numpy().flatten()
-        # print("Is demos detatched", is_demos)
         assert ps.shape == is_demos.shape
         pas = self._pa(ps, is_demos)
-        # print("Updated Priorities", pas)
         self.per_prio_max = max(pas.max(), self.per_prio_max)
 
         for index, pa in zip(self._cached, pas):
@@ -132,7 +120,6 @@ class LazyPrioritizedDemMultiStepMemory(LazyDemMultiStepMemory):
             self.it_sum[index] = pa
             self.it_min[index] = pa
 
-        # print("Updated Priorities", pas)
         self._cached = None
     
     @property
