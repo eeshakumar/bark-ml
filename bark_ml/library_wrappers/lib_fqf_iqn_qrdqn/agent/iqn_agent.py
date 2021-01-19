@@ -29,7 +29,7 @@ class IQNAgent(BaseAgent):
     super(IQNAgent, self).reset_params(params)
     self.N = params["ML"]["IQNAgent"]["N", "", 64]
     self.N_dash = params["ML"]["IQNAgent"]["N_dash", "", 64]
-    self.K = params["ML"]["IQNAgent"]["N_dash", "", 32]
+    self.K = params["ML"]["IQNModel"]["K", "", 32]
     self.num_cosines = params["ML"]["IQNAgent"]["NumCosines", "", 64]
     self.kappa = params["ML"]["IQNAgent"]["Kappa", "", 1.0]
 
@@ -102,14 +102,16 @@ class IQNAgent(BaseAgent):
     state_embeddings = self.online_net.calculate_state_embeddings(states)
 
     if self.is_learn_from_demonstrations:
-      quantile_loss, mean_q, errors = self.calculate_loss(
+      quantile_loss, mean_q, errors, supervised_margin_loss = self.calculate_loss(
           state_embeddings, actions, rewards, next_states, dones, weights, states, is_demos)
+      total_loss = quantile_loss + supervised_margin_loss
     else:
       quantile_loss, mean_q, errors = self.calculate_loss(
           state_embeddings, actions, rewards, next_states, dones, weights, states)
-
+      total_loss = quantile_loss
+    
     gradient = update_params(self.optim,
-                  quantile_loss,
+                  total_loss,
                   networks=[self.online_net],
                   retain_graph=False,
                   grad_cliping=self.grad_cliping)
@@ -139,8 +141,6 @@ class IQNAgent(BaseAgent):
 
     # get current q values from network
     self.online_net.sample_noise()
-    current_q = self.target_net.calculate_q(states=states)
-    # print("Current Q", current_q.shape)
 
     # Calculate quantile values of current states and actions at tau_hats.
     current_sa_quantiles = evaluate_quantile_at_action(
@@ -194,17 +194,24 @@ class IQNAgent(BaseAgent):
 
     quantile_huber_loss = calculate_quantile_huber_loss(td_errors, taus,
                                                         weights, self.kappa)
-    total_loss = quantile_huber_loss
 
     if self.is_learn_from_demonstrations:
       assert is_demos is not None
       supervised_classification_loss = calculate_supervised_classification_quantile_loss(
-        actions, states, self.target_net, taus, state_embeddings, is_demos,
+        actions, states, self.target_net, tau_dashes, state_embeddings, is_demos,
         self.action_space._n, self.device, 
         self.demonstrator_loss_params["supervised_margin_weight", "", 0.5],
         self.demonstrator_loss_params["expert_margin", "", 0.8]
       )
-      total_loss += supervised_classification_loss
+      print("Supervised margin Loss", supervised_classification_loss)
+      self.writer.add_scalar('loss/supervised_margin_loss',
+                              supervised_classification_loss.detach().item(), 4 * self.steps)
+      total_loss = quantile_huber_loss + supervised_classification_loss
+      self.writer.add_scalar('loss/total_loss',
+                              total_loss.detach().item(), 4 * self.steps)
 
-    return total_loss, next_q.detach().mean().item(), \
+      return quantile_huber_loss, next_q.detach().mean().item(), \
+        td_errors.detach().abs(), supervised_classification_loss      
+
+    return quantile_huber_loss, next_q.detach().mean().item(), \
         td_errors.detach().abs()

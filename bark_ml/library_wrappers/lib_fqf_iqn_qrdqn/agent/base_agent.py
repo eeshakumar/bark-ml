@@ -96,7 +96,7 @@ class TrainingBenchmark:
 
 class BaseAgent(BehaviorModel):
   def __init__(self, agent_save_dir=None, env=None, params=None, training_benchmark=None, checkpoint_load=None,
-               is_learn_from_demonstrations = False):
+               is_learn_from_demonstrations = False, is_checkpoint_run=False):
     BehaviorModel.__init__(self, params)
     self._params = params
     self._env = env
@@ -116,6 +116,9 @@ class BaseAgent(BehaviorModel):
       self.init_always()
       self.load_models(BaseAgent.check_point_directory(agent_save_dir, checkpoint_load) \
                     if checkpoint_load=="best" else BaseAgent.check_point_directory(agent_save_dir, checkpoint_load) )
+      self.is_checkpoint_run = is_checkpoint_run
+      if self.is_checkpoint_run:
+        self.beliefs_info = []
     else:
       raise ValueError("Unusual param combination for agent initialization.")
 
@@ -158,6 +161,7 @@ class BaseAgent(BehaviorModel):
   def load_pickable_members(self, agent_save_dir):
     pickables = from_pickle(BaseAgent.pickable_directory(agent_save_dir), "agent_pickables")
     self.__dict__.update(pickables)
+    self._agent_save_dir = agent_save_dir
 
   def reset_training_variables(self):
     # Replay memory which is memory-efficient to store stacked frames.
@@ -272,12 +276,7 @@ class BaseAgent(BehaviorModel):
       assert self.demonstrations is not None, "Run invoked incorrectly, demonstrator not found!"
 
       # Extract and append demonstrations to memory
-      for demo in self.demonstrations:
-        (state, action, reward, next_state, done, is_demo) = demo
-        self.memory.append(state, action, reward, next_state, done, is_demo)
-
-      assert self.memory._n == len(self.demonstrations)
-      assert self.memory.is_full(), "Memory not filled with demonstrations"
+      self.load_demonstrations(demonstrations)
 
       self.train_on_demonstrations()
 
@@ -290,11 +289,20 @@ class BaseAgent(BehaviorModel):
                                 self.demonstrator_buffer_params["demo_ratio"])
       self.train_episodes(num_episodes=num_episodes)
 
+  def load_demonstrations(self, demonstrations):
+      num_rew = 0
+      for demo in self.demonstrations:
+          (state, action, reward, next_state, done, is_demo) = demo
+          self.memory.append(state, action, reward, next_state, done, is_demo)
+      # assert self.memory._n == (len(self.demonstrations) - self.multi_step + 1)
+      # assert self.memory.is_full(), "Memory not filled with demonstrations"    
+
   def train_on_demonstrations(self):
     while True:
       self.train_step_interval(demo_only=True)
-      if self.steps > self.online_gradient_update_steps:
-        print("Initial gradient updates completed. Totoal steps", self.steps)
+      print(f"Step {self.learning_steps} complete")
+      if self.learning_steps > self.online_gradient_update_steps:
+        print("Initial gradient updates completed. Totoal steps", self.learning_steps)
         break
 
   def train_episodes(self, num_episodes=50000):
@@ -334,11 +342,11 @@ class BaseAgent(BehaviorModel):
 
   @property
   def set_action_externally(self):
-    return self.set_action_externally
+    return self._set_action_externally
 
   @set_action_externally.setter
   def set_action_externally(self, externally):
-    self.set_action_externally = externally
+    self._set_action_externally = externally
 
   def ActionToBehavior(self, action):
     # NOTE: will either be set externally or internally
@@ -361,6 +369,8 @@ class BaseAgent(BehaviorModel):
     # NOTE: if training is enabled the action is set externally
     if not self.set_action_externally:
       observed_state = self.observer.Observe(observed_world)
+      if self.is_checkpoint_run:
+        self.beliefs_info.append(self.observer.beliefs)
       action = self.Act(observed_state)
       self._action = action
 
@@ -373,6 +383,12 @@ class BaseAgent(BehaviorModel):
     BehaviorModel.SetLastTrajectory(self, trajectory)
     BehaviorModel.SetLastAction(self, dynamic_action)
     return trajectory
+
+  def save_beliefs_info(self, filename):
+      import pandas as pd
+      df = pd.DataFrame(self.beliefs_info)
+      print(f"Storing beliefs to {filename}")
+      df.to_pickle(filename)
 
   def learn(self):
     pass
@@ -488,8 +504,10 @@ class BaseAgent(BehaviorModel):
                  f'episode steps: {episode_steps:<4}  '
                  f'return: {episode_return:<5.1f}')
 
-  def train_step_interval(self, demo_only=True):
+  def train_step_interval(self, demo_only=False):
     if demo_only:
+      self.online_net.train()
+      self.target_net.train()
       self.steps += 1
     self.epsilon_train.step()
     if self.is_learn_from_demonstrations:
@@ -502,9 +520,12 @@ class BaseAgent(BehaviorModel):
       self.learn()
 
     if self.steps % self.eval_interval == 0:
-      self.evaluate()
-      self.save(checkpoint_type='last')
-      self.online_net.train()
+      if demo_only:
+        self.save(checkpoint_type='last_demo')
+      else:
+        self.evaluate()
+        self.save(checkpoint_type='last')
+        self.online_net.train()
 
   def evaluate(self):
     if not self._training_benchmark:
