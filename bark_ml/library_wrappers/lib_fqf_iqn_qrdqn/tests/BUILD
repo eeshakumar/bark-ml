@@ -14,6 +14,23 @@ py_test(
     visibility = ["//visibility:public"],
 )
 
+py_test(
+    name = "test_loss_functions",
+    srcs = ["test_loss_functions.py"],
+    data = [
+            "@bark_project//bark:generate_core",
+            ],
+    imports = ["../external/bark_project/bark/python_wrapper/",
+              ],
+    deps = ["//bark_ml/environments:single_agent_runtime",
+            "//bark_ml/environments:gym",
+            "//bark_ml/library_wrappers/lib_fqf_iqn_qrdqn/agent:agents",
+            "//bark_ml/commons:py_spaces",
+            "//bark_ml/library_wrappers/lib_fqf_iqn_qrdqn:utils",
+           ],
+    visibility = ["//visibility:public"],
+)
+
 py_library(
    name = "test_demo_behavior",
    srcs = ["test_demo_behavior.py"],

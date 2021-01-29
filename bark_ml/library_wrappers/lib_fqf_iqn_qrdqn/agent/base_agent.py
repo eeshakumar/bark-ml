@@ -304,6 +304,7 @@ class BaseAgent(BehaviorModel):
       if self.learning_steps > self.online_gradient_update_steps:
         print("Initial gradient updates completed. Totoal steps", self.learning_steps)
         break
+    # self.evaluate()
 
   def train_episodes(self, num_episodes=50000):
     while True:
@@ -520,12 +521,12 @@ class BaseAgent(BehaviorModel):
       self.learn()
 
     if self.steps % self.eval_interval == 0:
-      if demo_only:
-        self.save(checkpoint_type='last_demo')
-      else:
-        self.evaluate()
-        self.save(checkpoint_type='last')
-        self.online_net.train()
+      # if demo_only:
+      #   self.save(checkpoint_type='last_demo')
+      # else:
+      self.evaluate()
+      self.save(checkpoint_type='last')
+      self.online_net.train()
 
   def evaluate(self):
     if not self._training_benchmark:
