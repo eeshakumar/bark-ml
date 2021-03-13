@@ -73,24 +73,8 @@ def calculate_huber_loss(td_errors, kappa=1.0):
                      kappa * (td_errors.abs() - 0.5 * kappa))
 
 
-def calculate_supervised_margin_classification_loss(current_q, actions, predicted_actions, total_actions, is_demos, device, 
-                                                    margin=0.8):
-  """supervised margin loss to force Q value of all non expert actions to be lower"""
-  sampled_batch_margin_loss = get_margin_loss(actions, total_actions, is_demos, margin, device)
-  assert sampled_batch_margin_loss.shape == current_q.shape
-  q1 = torch.max(current_q + sampled_batch_margin_loss, dim=1)[0]
-  q2 = torch.diag(current_q[torch.arange(current_q.size(0)), actions.long()])
-  q1 = q1.reshape(actions.shape)
-  q2 = q2.reshape(actions.shape)
-  assert q1.shape == q2.shape
-  loss = is_demos * (q1 - q2)
-  # net loss is mean of batch loss
-  assert loss.shape == actions.shape
-  return loss.mean()
-
-
 def calculate_supervised_classification_quantile_loss(actions, states, online_net, taus, state_embeddings,
-                                                      next_state_embeddings, is_demos, total_actions, device,
+                                                      is_demos, total_actions, device,
                                                       supervised_margin_weight=0.5, expert_margin=0.8):
   """supervised classification loss for IQN quantiles"""
   sampled_batch_margin_loss = get_margin_loss(actions, total_actions, is_demos, expert_margin, device)

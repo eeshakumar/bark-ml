@@ -296,7 +296,7 @@ class IQNAgent(BaseAgent):
       if self.is_learn_from_demonstrations:
         assert is_demos is not None
         supervised_classification_loss = calculate_supervised_classification_quantile_loss(
-          actions, states, self.online_net, taus, state_embeddings, next_state_embeddings, is_demos,
+          actions, states, self.online_net, taus, state_embeddings, is_demos,
           self.action_space._n,
           self.device,
           self.demonstrator_loss_params["supervised_margin_weight", "", 0.5],

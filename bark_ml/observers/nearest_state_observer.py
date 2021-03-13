@@ -85,9 +85,11 @@ class NearestAgentsObserver(StateObserver):
     Revert conversion of the observed world for NN input.
     This is only done for the ego vehicle as we are only interested in the ego
     vehicle trajectory.
+    :param observed_states: NN Input states
+    :type observed_states: list
+    :return unnormed_ego_states: Converted NN states into world states
     """
     unnormed_ego_states = self._reverse_norm(observed_states)
-
     return unnormed_ego_states
 
   @property
@@ -117,6 +119,10 @@ class NearestAgentsObserver(StateObserver):
     return agent_state
 
   def _reverse_norm(self, agent_state):
+    """
+    The Observed World States for an agent are normed for NN Input.
+    This function reverses the norm for the agent
+    """
     # Reverse norm operation applied to convert agent state
     if not self._NormalizationEnabled:
       return agent_state
