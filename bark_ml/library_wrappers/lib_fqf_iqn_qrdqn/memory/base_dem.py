@@ -42,7 +42,10 @@ class LazyDemMemory(LazyMemory):
             # assume memory already contains demo samples
             self._dn = self.demo_capacity - 1
             self._n = self._dn
-            self._p = self._dn
+            if self.demo_capacity == 0:
+                self._p = 0
+            else:
+                self._p = self._dn
         else:
             self._dn = 0
         self._an = self.demo_capacity

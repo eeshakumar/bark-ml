@@ -51,7 +51,6 @@ class LazyPrioritizedDemMultiStepMemory(LazyDemMultiStepMemory):
         return total_p
 
     def append(self, state, action, reward, next_state, done, is_demo, p=None):
-        # print("LazyPrioritizedDemMultiStepMemory Append")
         # TODO: Change priority calculation by defining _pa(with epsilon?)
         if p is None:
             if is_demo:
@@ -91,8 +90,6 @@ class LazyPrioritizedDemMultiStepMemory(LazyDemMultiStepMemory):
         assert self._cached is None, 'Update priorities before sampling.'
 
         self._cached = self._sample_idxes(batch_size)
-        # cached stores index of retrieved batch elements
-        # print("Retrieving indices", self._cached)
         batch = self._sample(self._cached, batch_size)
         weights = self._calc_weights(self._cached)
         return batch, weights
@@ -121,6 +118,14 @@ class LazyPrioritizedDemMultiStepMemory(LazyDemMultiStepMemory):
             self.it_min[index] = pa
 
         self._cached = None
+
+    def reset_offline(self, capacity, state_shape, device, demo_ratio,
+                      per_beta=0.6, per_beta_steps=75000):
+        super().reset_offline(capacity, state_shape, device, demo_ratio)
+        self.per_beta = LinearAnneaer(per_beta, 1.0, per_beta_steps)
+        for index in range(self._an, self._an + self.agent_capacity):
+            self.it_min[index] = 0
+            self.it_sum[index] = 0
     
     @property
     def sampled(self):
