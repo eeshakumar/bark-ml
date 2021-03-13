@@ -6,13 +6,7 @@ import matplotlib.pyplot as plt
 
 def update_params(optim, loss, networks, retain_graph=False, grad_cliping=None, count=0):
   optim.zero_grad()
-  # loss.register_hook(lambda grad: print("Loss", grad))
-  # loss.retain_grad()
-  # plot_grad_flow(count, networks[0].named_parameters())
-  # for p in networks[0].parameters():
-  #   p.retain_grad = True
   loss.backward(retain_graph=retain_graph)
-  # plot_grad_flow(count, networks[0].named_parameters())
   # Clip norms of gradients to stebilize training.
   if grad_cliping:
     for net in networks:
@@ -98,47 +92,17 @@ def calculate_supervised_margin_classification_loss(current_q, actions, predicte
 def calculate_supervised_classification_quantile_loss(actions, states, online_net, taus, state_embeddings,
                                                       next_state_embeddings, is_demos, total_actions, device,
                                                       supervised_margin_weight=0.5, expert_margin=0.8):
-  # #get q values from target network
-  # curr_target_q = target_net.calculate_q(states=states)
-  # print("Calculated q", curr_target_q.shape)
-
-  # #get greedy actions from current q values
-  # curr_target_q_actions = torch.argmax(curr_target_q, dim=1, keepdim=True)
-
-  # #get quantiles for all actions
-  # curr_target_quantiles = target_net.calculate_quantiles(taus, 
-  #                                                           state_embeddings=state_embeddings)
-
-  # # print("Current target quantiles", curr_target_quantiles.shape)
-  # curr_target_quantiles_by_action = evaluate_quantile_at_action(
-  #   curr_target_quantiles,
-  #   curr_target_q_actions
-  # )
-
-  # #q value is then the mean of the quantiles Q(s, a)
-  # curr_target_quantiles_by_action_q = curr_target_quantiles_by_action.mean(axis=1)
-
-  # curr_target_quantiles_q = curr_target_quantiles.mean(axis=1)
+  """supervised classification loss for IQN quantiles"""
   sampled_batch_margin_loss = get_margin_loss(actions, total_actions, is_demos, expert_margin, device)
-  # print("Sampled large margin loss", sampled_batch_margin_loss)
-  # q1, _ = torch.max(curr_target_quantiles_by_action_q + sampled_batch_margin_loss, axis=1)
-  # print("Curr target quantiles q max", q1.shape)
-
   weights = supervised_margin_weight * is_demos.squeeze()
-  # print("Calculated weights", weights)
-  # q2 = torch.diag(curr_target_quantiles_q[torch.arange(curr_target_quantiles_q.size(0)), actions.long()])
-
   current_sa_quantiles = online_net.calculate_quantiles(taus, state_embeddings=state_embeddings)
-  # print(current_sa_quantiles.shape)
   q = current_sa_quantiles.mean(dim=1)
-  # print("Actions ", actions)
-  # print("Q values", q)
-  # print("Actions and q", actions, q)
   loss = calculate_expert_loss(q, sampled_batch_margin_loss, is_demos, actions, weights)
   return loss.mean()
 
 
 def calculate_expert_loss(q, sampled_batch_margin_loss, is_demos, actions, weights):
+  """calculate expert supervised loss"""
   q1, _ = torch.max(q + sampled_batch_margin_loss, axis=1)
   expert_actions = is_demos * actions
   q2 = q.gather(1, expert_actions.long()).squeeze()
@@ -177,7 +141,7 @@ def calculate_quantile_huber_loss(td_errors, taus, weights=None, kappa=1.0):
   else:
     quantile_huber_loss = batch_quantile_huber_loss.mean()
 
-  print("Quantile huber loss", quantile_huber_loss)
+  # print("Quantile huber loss", quantile_huber_loss)
   return quantile_huber_loss
 
 

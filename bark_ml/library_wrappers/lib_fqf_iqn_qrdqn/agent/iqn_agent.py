@@ -15,7 +15,7 @@ from torch.optim import Adam
 from bark_ml.library_wrappers.lib_fqf_iqn_qrdqn.model import IQN
 from bark_ml.library_wrappers.lib_fqf_iqn_qrdqn.utils \
  import disable_gradients, update_params, \
- calculate_quantile_huber_loss, calculate_supervised_margin_classification_loss, \
+ calculate_l2_reg_loss, calculate_quantile_huber_loss, \
  calculate_supervised_classification_quantile_loss, evaluate_quantile_at_action
 from .base_agent import BaseAgent
 
@@ -66,6 +66,16 @@ class IQNAgent(BaseAgent):
                                                           5e-5],
                         eps=1e-2 / self.batch_size)
 
+    if self.is_common_taus:
+      self.taus = torch.rand(self.batch_size,
+                             self.N,
+                             dtype=torch.float32,
+                             device=self.device)
+      self.tau_dashes = torch.rand(self.batch_size,
+                                   self.N_dash,
+                                   dtype=torch.float32,
+                                   device=self.device)
+
   def clean_pickables(self, pickables):
     super(IQNAgent, self).clean_pickables(pickables)
     del pickables["optim"]
@@ -102,7 +112,7 @@ class IQNAgent(BaseAgent):
     state_embeddings = self.online_net.calculate_state_embeddings(states)
 
     if self.is_learn_from_demonstrations:
-      quantile_loss, mean_q, errors, supervised_margin_loss = self.calculate_loss(
+      quantile_loss, mean_q, errors, supervised_margin_loss, l2_reg_loss = self.calculate_lfd_loss(
           state_embeddings, actions, rewards, next_states, dones, weights, states, is_demos)
       total_loss = quantile_loss + supervised_margin_loss
     else:
@@ -123,21 +133,29 @@ class IQNAgent(BaseAgent):
         self.memory.update_priority(errors)
 
     if 4 * self.steps % self.summary_log_interval == 0:
-      self.writer.add_scalar('loss/quantile_loss',
-                              quantile_loss.detach().item(), 4 * self.steps)
-      self.writer.add_scalar('stats/mean_Q', mean_q, 4 * self.steps)
-      self.writer.add_scalar('stats/mean_batch_reward', mean_batch_reward, 4 * self.steps)
+      if self.is_learn_from_demonstrations and not self.is_online_demo:
+        self.writer.add_scalar('loss/quantile_loss_offline',
+                                quantile_loss.detach().item(), 4 * self.steps)
+        self.writer.add_scalar('stats/mean_Q_offline', mean_q, 4 * self.steps)
+        self.writer.add_scalar('stats/mean_batch_reward_offline', mean_batch_reward, 4 * self.steps)
+      else:
+        self.writer.add_scalar('loss/quantile_loss',
+                                quantile_loss.detach().item(), 4 * self.steps)
+        self.writer.add_scalar('stats/mean_Q', mean_q, 4 * self.steps)
+        self.writer.add_scalar('stats/mean_batch_reward', mean_batch_reward, 4 * self.steps)
       if gradient is not None:
-        print("Registering grad")
         self.writer.add_scalar('loss/grad', gradient.detach().item(), 4 * self.steps)
 
   def calculate_loss(self, state_embeddings, actions, rewards, next_states,
                      dones, weights, states, is_demos=None):
+    if self.is_common_taus:
+      taus = self.taus
+    else:
     # Sample fractions.
-    taus = torch.rand(self.batch_size,
-                      self.N,
-                      dtype=state_embeddings.dtype,
-                      device=state_embeddings.device)
+      taus = torch.rand(self.batch_size,
+                        self.N,
+                        dtype=state_embeddings.dtype,
+                        device=state_embeddings.device)
 
     # get current q values from network
     self.online_net.sample_noise()
@@ -172,10 +190,13 @@ class IQNAgent(BaseAgent):
          self.target_net.calculate_state_embeddings(next_states)
 
       # Sample next fractions.
-      tau_dashes = torch.rand(self.batch_size,
-                              self.N_dash,
-                              dtype=state_embeddings.dtype,
-                              device=state_embeddings.device)
+      if self.is_common_taus:
+        tau_dashes = self.tau_dashes
+      else:
+        tau_dashes = torch.rand(self.batch_size,
+                                self.N_dash,
+                                dtype=state_embeddings.dtype,
+                                device=state_embeddings.device)
 
       # Calculate quantile values of next states and next actions.
       next_sa_quantiles = evaluate_quantile_at_action(
@@ -195,23 +216,97 @@ class IQNAgent(BaseAgent):
     quantile_huber_loss = calculate_quantile_huber_loss(td_errors, taus,
                                                         weights, self.kappa)
 
-    if self.is_learn_from_demonstrations:
-      assert is_demos is not None
-      supervised_classification_loss = calculate_supervised_classification_quantile_loss(
-        actions, states, self.target_net, tau_dashes, state_embeddings, is_demos,
-        self.action_space._n, self.device, 
-        self.demonstrator_loss_params["supervised_margin_weight", "", 0.5],
-        self.demonstrator_loss_params["expert_margin", "", 0.8]
-      )
-      print("Supervised margin Loss", supervised_classification_loss)
-      self.writer.add_scalar('loss/supervised_margin_loss',
-                              supervised_classification_loss.detach().item(), 4 * self.steps)
-      total_loss = quantile_huber_loss + supervised_classification_loss
-      self.writer.add_scalar('loss/total_loss',
-                              total_loss.detach().item(), 4 * self.steps)
-
-      return quantile_huber_loss, next_q.detach().mean().item(), \
-        td_errors.detach().abs(), supervised_classification_loss      
-
     return quantile_huber_loss, next_q.detach().mean().item(), \
         td_errors.detach().abs()
+
+  def calculate_lfd_loss(self, state_embeddings, actions, rewards, next_states,
+                          dones, weights, states, is_demos=None):
+      # Sample fractions.
+      taus = torch.rand(self.batch_size,
+                        self.N,
+                        dtype=state_embeddings.dtype,
+                        device=state_embeddings.device)
+
+
+      # Sample next fractions.
+      tau_dashes = torch.rand(self.batch_size,
+                              self.N_dash,
+                              dtype=state_embeddings.dtype,
+                              device=state_embeddings.device)
+
+      # get current q values from network
+      self.online_net.sample_noise()
+
+      # Calculate quantile values of current states and actions at tau_hats.
+      current_sa_quantiles = evaluate_quantile_at_action(
+          self.online_net.calculate_quantiles(taus,
+                                              state_embeddings=state_embeddings),
+          actions)
+      assert current_sa_quantiles.shape == (self.batch_size, self.N, 1)
+
+      with torch.no_grad():
+          # Calculate Q values of next states.
+          if self.double_q_learning:  # note: double q learning set to always false.
+            # Sample the noise of online network to decorrelate between
+            # the action selection and the quantile calculation.
+            self.online_net.sample_noise()
+            next_q = self.online_net.calculate_q(states=next_states)
+          else:
+            next_state_embeddings = \
+            self.target_net.calculate_state_embeddings(next_states)
+            next_q = self.target_net.calculate_q(
+                state_embeddings=next_state_embeddings)
+
+          # Calculate greedy actions.
+          next_actions = torch.argmax(next_q, dim=1, keepdim=True)
+          assert next_actions.shape == (self.batch_size, 1)
+
+          # Calculate features of next states.
+          if self.double_q_learning:
+            next_state_embeddings = \
+            self.target_net.calculate_state_embeddings(next_states)
+
+          # Sample next fractions.
+          if self.is_common_taus:
+            tau_dashes = self.tau_dashes
+          else:
+            tau_dashes = torch.rand(self.batch_size,
+                                    self.N_dash,
+                                    dtype=state_embeddings.dtype,
+                                    device=state_embeddings.device)
+
+          # Calculate quantile values of next states and next actions.
+          next_sa_quantiles = evaluate_quantile_at_action(
+              self.target_net.calculate_quantiles(
+                  tau_dashes, state_embeddings=next_state_embeddings),
+              next_actions).transpose(1, 2)
+          assert next_sa_quantiles.shape == (self.batch_size, 1, self.N_dash)
+
+          # Calculate target quantile values.
+          target_sa_quantiles = rewards[..., None] + (
+              1.0 - dones[..., None]) * self.gamma_n * next_sa_quantiles
+          assert target_sa_quantiles.shape == (self.batch_size, 1, self.N_dash)
+
+
+      td_errors = target_sa_quantiles - current_sa_quantiles
+      assert td_errors.shape == (self.batch_size, self.N, self.N_dash)
+
+      quantile_huber_loss = calculate_quantile_huber_loss(td_errors, taus,
+                                                        weights, self.kappa)
+      if self.is_learn_from_demonstrations:
+        assert is_demos is not None
+        supervised_classification_loss = calculate_supervised_classification_quantile_loss(
+          actions, states, self.online_net, taus, state_embeddings, next_state_embeddings, is_demos,
+          self.action_space._n,
+          self.device,
+          self.demonstrator_loss_params["supervised_margin_weight", "", 0.5],
+          self.demonstrator_loss_params["expert_margin", "", 0.8])
+        self.writer.add_scalar('loss/supervised_margin_loss',
+                              supervised_classification_loss.detach().item(), 4 * self.steps)
+
+        l2_reg_loss = calculate_l2_reg_loss(self.online_net, device=self.device)
+        self.writer.add_scalar('loss/l2_reg_loss_target',
+                                l2_reg_loss.detach().item(), 4 * self.steps)
+
+      return quantile_huber_loss, next_q.detach().mean().item(), \
+        td_errors.detach().abs(), supervised_classification_loss, l2_reg_loss

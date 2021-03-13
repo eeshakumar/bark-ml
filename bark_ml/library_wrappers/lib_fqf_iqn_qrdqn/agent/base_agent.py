@@ -96,14 +96,17 @@ class TrainingBenchmark:
 
 class BaseAgent(BehaviorModel):
   def __init__(self, agent_save_dir=None, env=None, params=None, training_benchmark=None, checkpoint_load=None,
-               is_learn_from_demonstrations = False, is_checkpoint_run=False):
+               is_learn_from_demonstrations=True, is_checkpoint_run=False, is_be_obs=False, is_common_taus=False,
+               is_online_demo=False):
     BehaviorModel.__init__(self, params)
     self._params = params
     self._env = env
     self._training_benchmark = training_benchmark or TrainingBenchmark()
     self._agent_save_dir = agent_save_dir
     self.is_learn_from_demonstrations = is_learn_from_demonstrations
-
+    self.is_checkpoint_run = is_checkpoint_run
+    self.is_common_taus = is_common_taus
+    self.is_online_demo = is_online_demo
     if not checkpoint_load and params:
       if not env:
         raise ValueError("Environment must be passed for initialization")
@@ -111,14 +114,28 @@ class BaseAgent(BehaviorModel):
       self.reset_action_observer(env)
       self.init_always()
       self.reset_training_variables()
+      # self.is_be_obs = is_be_obs
+      # if self.is_be_obs:
+      #   self.beliefs_info = []
     elif checkpoint_load:
-      self.load_pickable_members(agent_save_dir)
+      self.reset_params(self._params)
+      # self.is_be_obs = is_be_obs
+      # if self.is_be_obs:
+      #   self.beliefs_info = []
+      # if self.is_checkpoint_run:
+      #   self.q_values = []
+      #   self.quantiles = []
+      #   self.calc_taus = []
+      if is_learn_from_demonstrations:
+        self.reset_action_observer(env)
+      if is_online_demo:
+        self.load_only_memory_pickle(agent_save_dir)
+      else:
+        self.load_pickable_members(agent_save_dir)
       self.init_always()
       self.load_models(BaseAgent.check_point_directory(agent_save_dir, checkpoint_load) \
                     if checkpoint_load=="best" else BaseAgent.check_point_directory(agent_save_dir, checkpoint_load) )
-      self.is_checkpoint_run = is_checkpoint_run
-      if self.is_checkpoint_run:
-        self.beliefs_info = []
+      self.reset_training_variables(is_online_demo=is_online_demo)
     else:
       raise ValueError("Unusual param combination for agent initialization.")
 
@@ -158,13 +175,21 @@ class BaseAgent(BehaviorModel):
     self.clean_pickables(pickables)
     to_pickle(pickables, pickable_dir, "agent_pickables")
 
+  def load_only_memory_pickle(self, agent_save_dir):
+    logging.info("Pickling memory from: " + BaseAgent.pickable_directory(agent_save_dir))
+    pickables = from_pickle(BaseAgent.pickable_directory(agent_save_dir), "agent_pickables")
+    self.__dict__['memory'] = pickables['memory']
+    self._agent_save_dir = agent_save_dir
+
   def load_pickable_members(self, agent_save_dir):
+    logging.info("Pickling agent from: " + BaseAgent.pickable_directory(agent_save_dir))
     pickables = from_pickle(BaseAgent.pickable_directory(agent_save_dir), "agent_pickables")
     self.__dict__.update(pickables)
     self._agent_save_dir = agent_save_dir
 
-  def reset_training_variables(self):
+  def reset_training_variables(self, is_online_demo=False):
     # Replay memory which is memory-efficient to store stacked frames.
+    self.is_online_demo = is_online_demo
     if not self.is_learn_from_demonstrations:
       if self.use_per:
         beta_steps = (self.num_steps - self.start_steps) / \
@@ -186,21 +211,24 @@ class BaseAgent(BehaviorModel):
     else:
       # expect a learning from demonstrations setting, reset use_per to true
       self.use_per = True
-      beta_steps = (self.num_steps - self.start_steps) / \
-        self.update_interval
-      # initially all memory expects only demo samples
-      self.memory = LazyPrioritizedDemMultiStepMemory(
-            self.memory_size,
-            self.observer.observation_space.shape,
-            self.device,
-            self.gamma,
-            self.multi_step,
-            beta_steps=beta_steps,
-            epsilon_demo=self.demonstrator_buffer_params["epsilon_demo", "", 1.0],
-            epsilon_alpha=self.demonstrator_buffer_params["epsilon_alpha", "", 0.001],
-            alpha=self.demonstrator_buffer_params["alpha", "", 0.4],
-            per_beta_steps=self.demonstrator_buffer_params["per_beta_steps", "", 75000],
-            per_beta=self.demonstrator_buffer_params["per_beta", "", 0.6])
+      # do not reset memory if already loaded
+      if not is_online_demo:
+        beta_steps = (self.num_steps - self.start_steps) / \
+          self.update_interval
+        # initially all memory expects only demo samples
+        self.memory = LazyPrioritizedDemMultiStepMemory(
+              self.memory_size,
+              self.observer.observation_space.shape,
+              self.device,
+              self.gamma,
+              self.multi_step,
+              beta_steps=beta_steps,
+              epsilon_demo=self.demonstrator_buffer_params["epsilon_demo", "", 1.0],
+              epsilon_alpha=self.demonstrator_buffer_params["epsilon_alpha", "", 0.001],
+              alpha=self.demonstrator_buffer_params["alpha", "", 0.4],
+              per_beta_steps=self.demonstrator_buffer_params["per_beta_steps", "", 75000],
+              per_beta=self.demonstrator_buffer_params["per_beta", "", 0.6],
+              demo_ratio=self.demonstrator_buffer_params["demo_ratio", "", 1.0])
 
     self.steps = 0
     self.learning_steps = 0
@@ -273,7 +301,7 @@ class BaseAgent(BehaviorModel):
       self.demonstrations = demonstrations
       self.save(checkpoint_type="configured_with_demonstrations")
       assert self.is_learn_from_demonstrations, "Learn from demonstration params not set!"
-      assert self.demonstrations is not None, "Run invoked incorrectly, demonstrator not found!"
+      assert self.demonstrations is not None, "Run invoked incorrectly, demonstrations not found!"
 
       # Extract and append demonstrations to memory
       self.load_demonstrations(demonstrations)
@@ -284,27 +312,41 @@ class BaseAgent(BehaviorModel):
       self.save(checkpoint_type="trained_only_demonstrations")
     # if learn_only is False, load from previous training checkpoint, explore and learn
     else:
+      # update agent dir to current agent dir
+      self._agent_save_dir = os.path.join(self._params["Experiment"]["dir"], "agent")
+      self.writer = SummaryWriter(log_dir=BaseAgent.summary_dir(self.agent_save_dir))
+      if not os.path.exists(BaseAgent.summary_dir(self.agent_save_dir)):
+        os.makedirs(BaseAgent.summary_dir(self.agent_save_dir))
+      logging.info(f"Exploration learning DIR {self._agent_save_dir}")
+      logging.info(f"Summaries DIR {BaseAgent.summary_dir(self._agent_save_dir)}")
+      ckp_dir = BaseAgent.check_point_directory(self._agent_save_dir, "")
+      logging.info(f"Checkpoints DIR {ckp_dir}")
+      pickle_dir = BaseAgent.pickable_directory(self._agent_save_dir)
+      logging.info(f"New Pickables at {pickle_dir}")
+      self.memory_size = self.memory.capacity
       self.memory.reset_offline(self.memory_size, self.observer.observation_space.shape, 
                                 self.device,
-                                self.demonstrator_buffer_params["demo_ratio"])
+                                self.demonstrator_buffer_params["demo_ratio"],
+                                per_beta_steps=self.demonstrator_buffer_params["per_beta_steps"])
+      logging.info(f"Demo capacity: {self.memory.demo_capacity}/{self.memory.capacity}")
+      logging.info(f"{self.memory._dn + 1} demo samples remaining...")
       self.train_episodes(num_episodes=num_episodes)
+      logging.info(f"Total learning_steps/steps {self.learning_steps}/{self.steps}")
+      logging.info(f"Self generated data last at {self.memory._an}")
+      self.save(checkpoint_type="trained_mixed_experiences")
 
   def load_demonstrations(self, demonstrations):
-      num_rew = 0
       for demo in self.demonstrations:
           (state, action, reward, next_state, done, is_demo) = demo
-          self.memory.append(state, action, reward, next_state, done, is_demo)
-      # assert self.memory._n == (len(self.demonstrations) - self.multi_step + 1)
-      # assert self.memory.is_full(), "Memory not filled with demonstrations"    
+          self.memory.append(state, action, reward, next_state, done, is_demo)  
 
   def train_on_demonstrations(self):
     while True:
       self.train_step_interval(demo_only=True)
-      print(f"Step {self.learning_steps} complete")
+      logging.info(f"Step {self.learning_steps} complete")
       if self.learning_steps > self.online_gradient_update_steps:
-        print("Initial gradient updates completed. Totoal steps", self.learning_steps)
+        logging.info(f"Initial gradient updates completed. Learning steps {self.learning_steps}")
         break
-    # self.evaluate()
 
   def train_episodes(self, num_episodes=50000):
     while True:
@@ -364,14 +406,38 @@ class BaseAgent(BehaviorModel):
     state = torch.Tensor(state).unsqueeze(0).to(self.device).float()
     with torch.no_grad():
       actions = self.online_net(states=state)  # pylint: disable=not-callable
+      # if self.is_checkpoint_run:
+      #   q = self.online_net.calculate_q(states=state)
     return actions
+
+  # def save_q_values(self, filename):
+  #     import pandas as pd
+  #     df = pd.DataFrame(self.q_values)
+  #     print(f"Storing q values to {filename}")
+  #     df.to_pickle(filename)
+
+  # def save_quantiles(self, filename):
+  #     import pandas as pd
+  #     self.quantiles = np.asarray(self.quantiles)
+  #     print(self.quantiles.shape)
+  #     with open(filename, 'wb') as f:
+  #       pickle.dump(self.quantiles, f)
+  #     print(f"Storing quantile values {filename}")
+
+  # def save_taus(self, filename):
+  #     import pandas as pd
+  #     self.calc_taus = np.asarray(self.calc_taus)
+  #     print(self.calc_taus.shape)
+  #     with open(filename, 'wb') as f:
+  #       pickle.dump(self.calc_taus, f)
+  #     print(f"Storing quantile values {filename}")
 
   def Plan(self, dt, observed_world):
     # NOTE: if training is enabled the action is set externally
     if not self.set_action_externally:
       observed_state = self.observer.Observe(observed_world)
-      if self.is_checkpoint_run:
-        self.beliefs_info.append(self.observer.beliefs)
+      # if self.is_be_obs:
+        # self.beliefs_info.append(self.observer.beliefs)
       action = self.Act(observed_state)
       self._action = action
 
@@ -510,20 +576,18 @@ class BaseAgent(BehaviorModel):
       self.online_net.train()
       self.target_net.train()
       self.steps += 1
-    self.epsilon_train.step()
+    else:
+      self.epsilon_train.step()
     if self.is_learn_from_demonstrations:
       self.memory.per_beta.step()
 
     if self.steps % self.target_update_interval == 0:
       self.update_target()
 
-    if self.is_update():
+    if demo_only or self.is_update():
       self.learn()
 
     if self.steps % self.eval_interval == 0:
-      # if demo_only:
-      #   self.save(checkpoint_type='last_demo')
-      # else:
       self.evaluate()
       self.save(checkpoint_type='last')
       self.online_net.train()
@@ -538,11 +602,17 @@ class BaseAgent(BehaviorModel):
     if not self.best_eval_results or \
         self._training_benchmark.is_better(eval_results, self.best_eval_results):
       self.best_eval_results = eval_results
-      self.save(checkpoint_type='best')
+      if self.is_learn_from_demonstrations and not self.is_online_demo:
+        self.save(checkpoint_type='best_lfd')
+      else:
+        self.save(checkpoint_type='best')
 
     # We log evaluation results along with training frames = 4 * steps.
     for eval_result_name, eval_result in eval_results.items():
-      self.writer.add_scalar(eval_result_name, eval_result, 4 * self.steps)
+      if self.is_learn_from_demonstrations and not self.is_online_demo:
+        self.writer.add_scalar(eval_result_name + "_offline", eval_result, 4 * self.steps)
+      else:
+        self.writer.add_scalar(eval_result_name, eval_result, 4 * self.steps)
     logging.info('-' * 60)
     logging.info('Evaluation result: {}'.format(formatted_result))
     logging.info('-' * 60)
