@@ -96,7 +96,7 @@ class TrainingBenchmark:
 
 class BaseAgent(BehaviorModel):
   def __init__(self, agent_save_dir=None, env=None, params=None, training_benchmark=None, checkpoint_load=None,
-               is_learn_from_demonstrations=True, is_checkpoint_run=False, is_be_obs=False, is_common_taus=False,
+               is_learn_from_demonstrations=False, is_checkpoint_run=False, is_be_obs=False, is_common_taus=False,
                is_online_demo=False):
     BehaviorModel.__init__(self, params)
     self._params = params
@@ -114,18 +114,8 @@ class BaseAgent(BehaviorModel):
       self.reset_action_observer(env)
       self.init_always()
       self.reset_training_variables()
-      # self.is_be_obs = is_be_obs
-      # if self.is_be_obs:
-      #   self.beliefs_info = []
     elif checkpoint_load:
       self.reset_params(self._params)
-      # self.is_be_obs = is_be_obs
-      # if self.is_be_obs:
-      #   self.beliefs_info = []
-      # if self.is_checkpoint_run:
-      #   self.q_values = []
-      #   self.quantiles = []
-      #   self.calc_taus = []
       if is_learn_from_demonstrations:
         self.reset_action_observer(env)
       if is_online_demo:
@@ -406,31 +396,7 @@ class BaseAgent(BehaviorModel):
     state = torch.Tensor(state).unsqueeze(0).to(self.device).float()
     with torch.no_grad():
       actions = self.online_net(states=state)  # pylint: disable=not-callable
-      # if self.is_checkpoint_run:
-      #   q = self.online_net.calculate_q(states=state)
     return actions
-
-  # def save_q_values(self, filename):
-  #     import pandas as pd
-  #     df = pd.DataFrame(self.q_values)
-  #     print(f"Storing q values to {filename}")
-  #     df.to_pickle(filename)
-
-  # def save_quantiles(self, filename):
-  #     import pandas as pd
-  #     self.quantiles = np.asarray(self.quantiles)
-  #     print(self.quantiles.shape)
-  #     with open(filename, 'wb') as f:
-  #       pickle.dump(self.quantiles, f)
-  #     print(f"Storing quantile values {filename}")
-
-  # def save_taus(self, filename):
-  #     import pandas as pd
-  #     self.calc_taus = np.asarray(self.calc_taus)
-  #     print(self.calc_taus.shape)
-  #     with open(filename, 'wb') as f:
-  #       pickle.dump(self.calc_taus, f)
-  #     print(f"Storing quantile values {filename}")
 
   def Plan(self, dt, observed_world):
     # NOTE: if training is enabled the action is set externally
