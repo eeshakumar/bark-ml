@@ -262,11 +262,6 @@ class LossTests(unittest.TestCase):
             target_iqn.load_state_dict(online_iqn.state_dict())
         assert loss == 0.0
         
-
-
-
-
-        
         
 if __name__ == "__main__":
     unittest.main()
