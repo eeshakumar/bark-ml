@@ -1,12 +1,13 @@
 # Copyright (c) 2020 fortiss GmbH
 #
-# Authors: Patrick Hart, Julian Bernhard, Klemens Esterle, and
-# Tobias Kessler, Mansoor Nasir
+# Authors: Patrick Hart, Julian Bernhard, Klemens Esterle,
+# Tobias Kessler and Mansoor Nasir
 #
 # This software is released under the MIT License.
 # https://opensource.org/licenses/MIT
 
-# The code is adapted from opensource implementation - https://github.com/ku2482/fqf-iqn-qrdqn.pytorch
+# The code is adapted from opensource implementation
+# - https://github.com/ku2482/fqf-iqn-qrdqn.pytorch
 # MIT License -Copyright (c) 2020 Toshiki Watanabe
 
 import torch
@@ -17,32 +18,30 @@ from bark_ml.library_wrappers.lib_fqf_iqn_qrdqn.network import DQNBase, CosineEm
 
 
 class IQN(BaseModel):
-  def __init__(self, num_channels, num_actions, params, num_cosines,
-               dueling_net, noisy_net):
+
+  def __init__(self, num_channels, num_actions, params, num_cosines, noisy_net):
     super(IQN, self).__init__()
 
     self.num_channels = num_channels
     self.num_actions = num_actions
     self.num_cosines = num_cosines
-    self.dueling_net = dueling_net
     self.noisy_net = noisy_net
     self.K = params["ML"]["IQNModel"]["K", "", 32]
     self.embedding_dim = params["ML"]["IQNModel"]["EmbeddingDims", "", 512]
 
     # Feature extractor of DQN.
     self.dqn_net = DQNBase(num_channels=num_channels,
-                           embedding_dim=self.embedding_dim,
-                           hidden=params["ML"]["IQNModel"]["HiddenDims", "",
-                                                           512])
+                            embedding_dim=self.embedding_dim,
+                            hidden=params["ML"]["IQNModel"]["HiddenDims", "",
+                                                            512])
     # Cosine embedding network.
     self.cosine_net = CosineEmbeddingNetwork(num_cosines=num_cosines,
-                                             embedding_dim=self.embedding_dim,
-                                             noisy_net=noisy_net)
+                                              embedding_dim=self.embedding_dim,
+                                              noisy_net=noisy_net)
     # Quantile network.
     self.quantile_net = QuantileNetwork(num_actions=num_actions,
-                                        dueling_net=dueling_net,
-                                        embedding_dim=self.embedding_dim,
-                                        noisy_net=noisy_net)
+                                         embedding_dim=self.embedding_dim,
+                                         noisy_net=noisy_net)
 
   def calculate_state_embeddings(self, states):
     return self.dqn_net(states)
@@ -72,7 +71,7 @@ class IQN(BaseModel):
 
     # Calculate quantiles.
     quantiles = self.calculate_quantiles(taus,
-                                         state_embeddings=state_embeddings)
+                                          state_embeddings=state_embeddings)
     assert quantiles.shape == (batch_size, self.K, self.num_actions)
 
     # Calculate expectations of value distributions.

@@ -80,6 +80,16 @@ class NearestAgentsObserver(StateObserver):
       return concatenated_state, agent_ids_by_nearest
     return concatenated_state
 
+  def rev_observe_for_ego_vehicle(self, observed_states):
+    """
+    Revert conversion of the observed world for NN input.
+    This is only done for the ego vehicle as we are only interested in the ego
+    vehicle trajectory.
+    """
+    unnormed_ego_states = self._reverse_norm(observed_states)
+
+    return unnormed_ego_states
+
   @property
   def observation_space(self):
     # TODO(@hart): use from spaces.py
@@ -106,8 +116,30 @@ class NearestAgentsObserver(StateObserver):
                           self._VelocityRange)
     return agent_state
 
+  def _reverse_norm(self, agent_state):
+    # Reverse norm operation applied to convert agent state
+    if not self._NormalizationEnabled:
+      return agent_state
+    agent_state[int(StateDefinition.X_POSITION)] = \
+      self._range_to_norm(agent_state[int(StateDefinition.X_POSITION)],
+                          self._world_x_range)
+    agent_state[int(StateDefinition.Y_POSITION)] = \
+      self._range_to_norm(agent_state[int(StateDefinition.Y_POSITION)],
+                          self._world_y_range)
+    agent_state[int(StateDefinition.THETA_POSITION)] = \
+      self._range_to_norm(agent_state[int(StateDefinition.THETA_POSITION)],
+                          self._ThetaRange)
+    agent_state[int(StateDefinition.VEL_POSITION)] = \
+      self._range_to_norm(agent_state[int(StateDefinition.VEL_POSITION)],
+                          self._VelocityRange)
+    return agent_state
+
   def _norm_to_range(self, value, range):
     return (value - range[0])/(range[1]-range[0])
+
+  def _range_to_norm(self, adj_value, range):
+    # Get back the value adjusted to fit in range (normed value)
+    return adj_value * (range[1] - range[0]) + range[0]
 
   def _calculate_relative_agent_state(self, ego_agent_state, agent_state):
     return agent_state

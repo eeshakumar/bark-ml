@@ -9,6 +9,7 @@ from .segment_tree import SumTree, MinTree
 
 
 class LazyPrioritizedMultiStepMemory(LazyMultiStepMemory):
+
   def __init__(self,
                capacity,
                state_shape,

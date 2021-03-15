@@ -68,7 +68,7 @@ class LazyMemory(dict):
     self._n = 0
     self._p = 0
 
-  def append(self, state, action, reward, next_state, done, episode_done=None):
+  def append(self, state, action, reward, next_state, done):
     self._append(state, action, reward, next_state, done)
 
   def _append(self, state, action, reward, next_state, done):
@@ -95,16 +95,16 @@ class LazyMemory(dict):
   def _sample(self, indices, batch_size):
     bias = -self._p if self._n == self.capacity else 0
 
-    states = np.empty((batch_size, *self.state_shape), dtype=np.uint8)
-    next_states = np.empty((batch_size, *self.state_shape), dtype=np.uint8)
+    states = np.empty((batch_size, *self.state_shape), dtype=np.float32)
+    next_states = np.empty((batch_size, *self.state_shape), dtype=np.float32)
 
     for i, index in enumerate(indices):
       _index = np.mod(index + bias, self.capacity)
       states[i, ...] = self['state'][_index]
       next_states[i, ...] = self['next_state'][_index]
 
-    states = torch.ByteTensor(states).to(self.device).float() / 255.
-    next_states = torch.ByteTensor(next_states).to(self.device).float() / 255.
+    states = torch.FloatTensor(states).to(self.device)
+    next_states = torch.FloatTensor(next_states).to(self.device)
     actions = torch.LongTensor(self['action'][indices]).to(self.device)
     rewards = torch.FloatTensor(self['reward'][indices]).to(self.device)
     dones = torch.FloatTensor(self['done'][indices]).to(self.device)
@@ -139,6 +139,7 @@ class LazyMemory(dict):
 
 
 class LazyMultiStepMemory(LazyMemory):
+
   def __init__(self, capacity, state_shape, device, gamma=0.99, multi_step=3):
     super(LazyMultiStepMemory, self).__init__(capacity, state_shape, device)
 

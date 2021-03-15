@@ -1,12 +1,13 @@
 # Copyright (c) 2020 fortiss GmbH
 #
-# Authors: Patrick Hart, Julian Bernhard, Klemens Esterle, and
-# Tobias Kessler, Mansoor Nasir
+# Authors: Patrick Hart, Julian Bernhard, Klemens Esterle,
+# Tobias Kessler and Mansoor Nasir
 #
 # This software is released under the MIT License.
 # https://opensource.org/licenses/MIT
 
-# The code is adapted from opensource implementation - https://github.com/ku2482/fqf-iqn-qrdqn.pytorch
+# The code is adapted from opensource
+# implementation - https://github.com/ku2482/fqf-iqn-qrdqn.pytorch
 # MIT License -Copyright (c) 2020 Toshiki Watanabe
 
 import torch
@@ -20,9 +21,11 @@ from .base_agent import BaseAgent
 
 
 class FQFAgent(BaseAgent):
-  def __init__(self, env, test_env, params):
-    super(FQFAgent, self).__init__(env, test_env, params)
+  def __init__(self, *args, **kwargs):
+    super(FQFAgent, self).__init__(*args, **kwargs)
 
+  def reset_params(self, params):
+    super(FQFAgent, self).reset_params(params)
     # NOTE: The author said the training of Fraction Proposal Net is
     # unstable and value distribution degenerates into a deterministic
     # one rarely (e.g. 1 out of 20 seeds). So you can use entropy of value
@@ -32,21 +35,23 @@ class FQFAgent(BaseAgent):
     self.N = self._params["ML"]["FQFAgent"]["N", "", 32]
     self.num_cosines = self._params["ML"]["FQFAgent"]["NumCosines", "", 64]
     self.kappa = self._params["ML"]["FQFAgent"]["Kappa", "", 1.0]
-
-    # Online network.
-    self.online_net = FQF(num_channels=env.observation_space.shape[0],
+    self.fractional_learning_rate = self._params["ML"]["FQFAgent"]["FractionalLearningRate", "",
+                                          2.5e-9]
+  
+  def init_always(self):
+    super(FQFAgent, self).init_always()
+      # Online network.
+    self.online_net = FQF(num_channels=self.observer.observation_space.shape[0],
                           num_actions=self.num_actions,
                           N=self.N,
                           num_cosines=self.num_cosines,
-                          dueling_net=self.dueling_net,
                           noisy_net=self.noisy_net,
                           params=self._params).to(self.device)
     # Target network.
-    self.target_net = FQF(num_channels=env.observation_space.shape[0],
+    self.target_net = FQF(num_channels=self.observer.observation_space.shape[0],
                           num_actions=self.num_actions,
                           N=self.N,
                           num_cosines=self.num_cosines,
-                          dueling_net=self.dueling_net,
                           noisy_net=self.noisy_net,
                           target=True,
                           params=self._params).to(self.device)
@@ -58,8 +63,7 @@ class FQFAgent(BaseAgent):
 
     self.fraction_optim = RMSprop(
         self.online_net.fraction_net.parameters(),
-        lr=self._params["ML"]["FQFAgent"]["FractionalLearningRate", "",
-                                          2.5e-9],
+        lr=self.fractional_learning_rate,
         alpha=0.95,
         eps=0.00001)
 
@@ -69,6 +73,11 @@ class FQFAgent(BaseAgent):
         list(self.online_net.quantile_net.parameters()),
         lr=self._params["ML"]["FQFAgent"]["QuantileLearningRate", "", 5e-5],
         eps=1e-2 / self.batch_size)
+
+  def clean_pickables(self, pickables):
+    super(FQFAgent, self).clean_pickables(pickables)
+    del pickables["fraction_optim"]
+    del pickables["quantile_optim"]
 
   def update_target(self):
     self.target_net.dqn_net.load_state_dict(
@@ -84,8 +93,10 @@ class FQFAgent(BaseAgent):
     self.target_net.sample_noise()
 
     if self.use_per:
-      (states, actions, rewards, next_states, dones), weights = \
+      # print("Sample")
+      (states, actions, rewards, next_states, dones, is_demos), weights = \
        self.memory.sample(self.batch_size)
+      # print("Sampled demos", is_demos, weights)
     else:
       states, actions, rewards, next_states, dones = \
        self.memory.sample(self.batch_size)
@@ -102,20 +113,20 @@ class FQFAgent(BaseAgent):
     # Calculate quantile values of current states and actions at tau_hats.
     current_sa_quantile_hats = evaluate_quantile_at_action(
         self.online_net.calculate_quantiles(tau_hats,
-                                            state_embeddings=state_embeddings),
+                                             state_embeddings=state_embeddings),
         actions)
     assert current_sa_quantile_hats.shape == (self.batch_size, self.N, 1)
 
     # NOTE: Detach state_embeddings not to update convolution layers. Also,
     # detach current_sa_quantile_hats because I calculate gradients of taus
     # explicitly, not by backpropagation.
-    fraction_loss = self.calculate_fraction_loss(
+    fraction_loss = self._calculate_fraction_loss(
         state_embeddings.detach(), current_sa_quantile_hats.detach(), taus,
         actions, weights)
 
-    quantile_loss, mean_q, errors = self.calculate_quantile_loss(
-        state_embeddings, tau_hats, current_sa_quantile_hats, actions, rewards,
-        next_states, dones, weights)
+    quantile_loss, mean_q, errors = self._calculate_quantile_loss(
+        tau_hats, current_sa_quantile_hats, rewards, next_states, dones,
+        weights)
 
     entropy_loss = -self.ent_coef * entropies.mean()
 
@@ -134,22 +145,22 @@ class FQFAgent(BaseAgent):
                   grad_cliping=self.grad_cliping)
 
     if self.use_per:
-      self.memory.update_priority(errors)
+      self.memory.update_priority(errors, is_demos)
 
     if self.learning_steps % self.summary_log_interval == 0:
       self.writer.add_scalar('loss/fraction_loss',
-                             fraction_loss.detach().item(), 4 * self.steps)
+                              fraction_loss.detach().item(), 4 * self.steps)
       self.writer.add_scalar('loss/quantile_loss',
-                             quantile_loss.detach().item(), 4 * self.steps)
+                              quantile_loss.detach().item(), 4 * self.steps)
       if self.ent_coef > 0.0:
         self.writer.add_scalar('loss/entropy_loss',
-                               entropy_loss.detach().item(), 4 * self.steps)
+                                entropy_loss.detach().item(), 4 * self.steps)
 
       self.writer.add_scalar('stats/mean_Q', mean_q, 4 * self.steps)
       self.writer.add_scalar('stats/mean_entropy_of_value_distribution',
-                             entropies.mean().detach().item(), 4 * self.steps)
+                              entropies.mean().detach().item(), 4 * self.steps)
 
-  def calculate_fraction_loss(self, state_embeddings, sa_quantile_hats, taus,
+  def _calculate_fraction_loss(self, state_embeddings, sa_quantile_hats, taus,
                               actions, weights):
     assert not state_embeddings.requires_grad
     assert not sa_quantile_hats.requires_grad
@@ -194,8 +205,7 @@ class FQFAgent(BaseAgent):
 
     return fraction_loss
 
-  def calculate_quantile_loss(self, state_embeddings, tau_hats,
-                              current_sa_quantile_hats, actions, rewards,
+  def _calculate_quantile_loss(self, tau_hats, current_sa_quantile_hats, rewards,
                               next_states, dones, weights):
     assert not tau_hats.requires_grad
 
@@ -214,7 +224,8 @@ class FQFAgent(BaseAgent):
          self.target_net.calculate_state_embeddings(next_states)
         next_q = \
          self.target_net.calculate_q(
-          state_embeddings=next_state_embeddings)
+          state_embeddings=next_state_embeddings,
+          fraction_net=self.online_net.fraction_net)
 
       # Calculate greedy actions.
       next_actions = torch.argmax(next_q, dim=1, keepdim=True)
@@ -240,8 +251,8 @@ class FQFAgent(BaseAgent):
     td_errors = target_sa_quantile_hats - current_sa_quantile_hats
     assert td_errors.shape == (self.batch_size, self.N, self.N)
 
-    quantile_huber_loss = calculate_quantile_huber_loss(
-        td_errors, tau_hats, weights, self.kappa)
+    quantile_huber_loss = calculate_quantile_huber_loss(td_errors, tau_hats,
+                                                        weights, self.kappa)
 
     return quantile_huber_loss, next_q.detach().mean().item(), \
         td_errors.detach().abs()

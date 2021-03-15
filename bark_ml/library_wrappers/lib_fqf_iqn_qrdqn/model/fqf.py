@@ -1,27 +1,28 @@
 # Copyright (c) 2020 fortiss GmbH
 #
-# Authors: Patrick Hart, Julian Bernhard, Klemens Esterle, and
-# Tobias Kessler, Mansoor Nasir
+# Authors: Patrick Hart, Julian Bernhard, Klemens Esterle,
+# Tobias Kessler and Mansoor Nasir
 #
 # This software is released under the MIT License.
 # https://opensource.org/licenses/MIT
 
-# The code is adapted from opensource implementation - https://github.com/ku2482/fqf-iqn-qrdqn.pytorch
+# The code is adapted from opensource implementation -
+# https://github.com/ku2482/fqf-iqn-qrdqn.pytorch
 # MIT License -Copyright (c) 2020 Toshiki Watanabe
 
 from .base_model import BaseModel
-from bark_ml.library_wrappers.lib_fqf_iqn_qrdqn.network import DQNBase, CosineEmbeddingNetwork, \
- FractionProposalNetwork, QuantileNetwork
+from bark_ml.library_wrappers.lib_fqf_iqn_qrdqn.network import \
+  DQNBase, CosineEmbeddingNetwork, FractionProposalNetwork, QuantileNetwork
 
 
 class FQF(BaseModel):
+
   def __init__(self,
                num_channels,
                num_actions,
                params,
                N=64,
                num_cosines=32,
-               dueling_net=False,
                noisy_net=False,
                target=False):
     super(FQF, self).__init__()
@@ -30,28 +31,26 @@ class FQF(BaseModel):
     self.num_channels = num_channels
     self.num_actions = num_actions
     self.num_cosines = num_cosines
-    self.dueling_net = dueling_net
     self.noisy_net = noisy_net
-    self.target = params["ML"]["FQFModel"]["Target", "", False]
+    self.target = params["ML"]["FQFModel"]["Target", "", target]
     self.embedding_dim = params["ML"]["FQFModel"]["EmbeddingDims", "", 512]
 
     # Feature extractor of DQN.
     self.dqn_net = DQNBase(num_channels=num_channels,
-                           embedding_dim=self.embedding_dim,
-                           hidden=params["ML"]["FQFModel"]["HiddenDims", "",
-                                                           512])
+                            embedding_dim=self.embedding_dim,
+                            hidden=params["ML"]["FQFModel"]["HiddenDims", "",
+                                                            512])
     # Cosine embedding network.
     self.cosine_net = CosineEmbeddingNetwork(num_cosines=num_cosines,
-                                             embedding_dim=self.embedding_dim,
-                                             noisy_net=noisy_net)
+                                              embedding_dim=self.embedding_dim,
+                                              noisy_net=noisy_net)
     # Quantile network.
     self.quantile_net = QuantileNetwork(num_actions=num_actions,
-                                        dueling_net=dueling_net,
-                                        noisy_net=noisy_net,
-                                        embedding_dim=self.embedding_dim)
+                                         noisy_net=noisy_net,
+                                         embedding_dim=self.embedding_dim)
 
     # Fraction proposal network.
-    if not target:
+    if not self.target:
       self.fraction_net = FractionProposalNetwork(
           N=N, embedding_dim=self.embedding_dim)
 
@@ -82,7 +81,7 @@ class FQF(BaseModel):
                   states=None,
                   state_embeddings=None):
     assert states is not None or state_embeddings is not None
-    assert not self.target or fraction_net is not None
+    assert not self.target or self.fraction_net is not None
 
     if state_embeddings is None:
       state_embeddings = self.dqn_net(states)
@@ -92,11 +91,11 @@ class FQF(BaseModel):
     # Calculate fractions.
     if taus is None or tau_hats is None:
       taus, tau_hats, _ = self.calculate_fractions(
-          state_embeddings=state_embeddings)
+          state_embeddings=state_embeddings, fraction_net=fraction_net)
 
     # Calculate quantiles.
     quantile_hats = self.calculate_quantiles(tau_hats,
-                                             state_embeddings=state_embeddings)
+                                              state_embeddings=state_embeddings)
     assert quantile_hats.shape == (batch_size, self.N, self.num_actions)
 
     # Calculate expectations of value distribution.

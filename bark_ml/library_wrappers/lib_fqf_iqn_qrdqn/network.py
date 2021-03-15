@@ -6,7 +6,8 @@
 # This software is released under the MIT License.
 # https://opensource.org/licenses/MIT
 
-# The code is adapted from opensource implementation - https://github.com/ku2482/fqf-iqn-qrdqn.pytorch
+# The code is adapted from opensource
+# implementation - https://github.com/ku2482/fqf-iqn-qrdqn.pytorch
 # MIT License -Copyright (c) 2020 Toshiki Watanabe
 
 from copy import copy
@@ -31,16 +32,22 @@ def initialize_weights_he(m):
 
 
 class Flatten(nn.Module):
+
   def forward(self, x):
     return x.view(x.size(0), -1)
 
 
 class DQNBase(nn.Module):
+
   def __init__(self, num_channels, hidden=512, embedding_dim=512):
     super(DQNBase, self).__init__()
 
     self.net = nn.Sequential(
         torch.nn.Linear(num_channels, hidden),
+        torch.nn.ReLU(),
+        torch.nn.Linear(hidden, hidden),
+        torch.nn.ReLU(),
+        torch.nn.Linear(hidden, hidden),
         torch.nn.ReLU(),
         torch.nn.Linear(hidden, embedding_dim),
     ).apply(initialize_weights_he)
@@ -58,6 +65,7 @@ class DQNBase(nn.Module):
 
 
 class FractionProposalNetwork(nn.Module):
+
   def __init__(self, N=32, embedding_dim=7 * 7 * 64):
     super(FractionProposalNetwork, self).__init__()
 
@@ -97,10 +105,8 @@ class FractionProposalNetwork(nn.Module):
 
 
 class CosineEmbeddingNetwork(nn.Module):
-  def __init__(self,
-               num_cosines=64,
-               embedding_dim=7 * 7 * 64,
-               noisy_net=False):
+
+  def __init__(self, num_cosines=64, embedding_dim=7 * 7 * 64, noisy_net=False):
     super(CosineEmbeddingNetwork, self).__init__()
     linear = NoisyLinear if noisy_net else nn.Linear
 
@@ -130,35 +136,18 @@ class CosineEmbeddingNetwork(nn.Module):
 
 
 class QuantileNetwork(nn.Module):
-  def __init__(self,
-               num_actions,
-               embedding_dim=7 * 7 * 64,
-               dueling_net=False,
-               noisy_net=False):
+
+  def __init__(self, num_actions, embedding_dim=7 * 7 * 64, noisy_net=False):
     super(QuantileNetwork, self).__init__()
     linear = NoisyLinear if noisy_net else nn.Linear
 
-    # if not dueling_net:
     self.net = nn.Sequential(
         linear(embedding_dim, 512),
         nn.ReLU(),
         linear(512, num_actions),
     )
-    # else:
-    #     self.advantage_net = nn.Sequential(
-    #         linear(embedding_dim, 512),
-    #         nn.ReLU(),
-    #         linear(512, num_actions),
-    #     )
-    #     self.baseline_net = nn.Sequential(
-    #         linear(embedding_dim, 512),
-    #         nn.ReLU(),
-    #         linear(512, 1),
-    #     )
-
     self.num_actions = num_actions
     self.embedding_dim = embedding_dim
-    self.dueling_net = dueling_net
     self.noisy_net = noisy_net
 
   def forward(self, state_embeddings, tau_embeddings):
@@ -178,18 +167,13 @@ class QuantileNetwork(nn.Module):
         batch_size * N, self.embedding_dim)
 
     # Calculate quantile values.
-    # if not self.dueling_net:
     quantiles = self.net(embeddings)
-    # else:
-    #     advantages = self.advantage_net(embeddings)
-    #     baselines = self.baseline_net(embeddings)
-    #     quantiles =\
-    #         baselines + advantages - advantages.mean(1, keepdim=True)
 
     return quantiles.view(batch_size, N, self.num_actions)
 
 
 class NoisyLinear(nn.Module):
+
   def __init__(self, in_features, out_features, sigma=0.5):
     super(NoisyLinear, self).__init__()
 
